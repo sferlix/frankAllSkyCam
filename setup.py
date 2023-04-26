@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="Frank-AllSkyCam",                 # This is the name of the package
+    name="frankAllSkyCam",                 # This is the name of the package
     version="3.0.",                         # The initial release version
     author="Francesco Sferlazza",           # Full name of the author
     description="AllSkyCam Package",
