@@ -1,8 +1,12 @@
+import os
+import shutil
 from distutils.core import setup
+
+homepath = os.path.expanduser("~")
 setup(
   name = 'frankAllSkyCam',         # How you named your package folder (MyLib)
   packages = ['frankAllSkyCam'],   # Chose the same as "name"
-  version = '3.0',      # Start with a small number and increase it with every change you make
+  version = '3.2',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',   # Give a short description about your library
   author = 'Francesco Sferlazza',                   # Type in your name
@@ -27,3 +31,16 @@ setup(
     'Programming Language :: Python :: 3.9',
   ],
 )
+
+
+os.mkdir(homepath+"/frankAllSkyCam")
+os.mkdir(homepath+"/frankAllSkyCam/img")
+os.mkdir(homepath+"/frankAllSkyCam/logs")
+
+dest1 = homepath +'/frankAllSkyCam/config.txt'
+oldf1 = 'frankAllSkyCam/helper/config.txt'
+shutil.copy(oldf1, dest1)
+
+dest2 = homepath +'/frankAllSkyCam/index.html'
+oldf2 = 'frankAllSkyCam/helper/index.html'
+shutil.copy(oldf2, dest2)
