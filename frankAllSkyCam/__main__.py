@@ -9,7 +9,7 @@ from configparser import ConfigParser
 from frankAllSkyCam import imageHeader, fileManager, drawtext
 
 config = ConfigParser()
-config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt'))
+config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt')
 time_zone = str(config['site']['time_zone'])
 inte = str(config['site']['inte'])
 
