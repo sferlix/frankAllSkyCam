@@ -111,8 +111,9 @@ DOPO aver installato samba, dal windows puoi aprire il disco del raspberry con
 \\192.168.2.25
 inserisci le credenziali dell'utente pi ed avrai accesso alla cartella /home/pi
 
-# FASE 4 COPIA DEI FILEcopia la pagina html:
+# FASE 4 COPIA DEI FILE
 
+copia la pagina html:
 sudo cp/home/pi/program/index.html /var/www/html/index.html
 
 
