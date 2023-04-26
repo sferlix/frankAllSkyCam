@@ -1,0 +1,2 @@
+# frankAllSkyCam
+AllSkyCam software 
