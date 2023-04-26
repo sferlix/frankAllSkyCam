@@ -10,7 +10,7 @@ from configparser import ConfigParser
 from frankAllSkyCam import fileManager
 
 config = ConfigParser()
-config.read(os.path.join(os.path.dirname(__file__), '', 'config.txt'))
+config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt'))
 time_zone = str(config['site']['time_zone'])
 
 outputFolder = str(config['system']['otuputFolder'])

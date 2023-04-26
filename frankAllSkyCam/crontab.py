@@ -13,7 +13,7 @@ from configparser import ConfigParser
 import socket
 
 config = ConfigParser()
-config.read(os.path.join(os.path.dirname(__file__), '', 'config.txt'))
+config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt'))
 latitude  = float(config['site']['latitude'])
 longitude = float(config['site']['longitude'])
 timeZone = str(config['site']['time_zone'])

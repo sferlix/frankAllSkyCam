@@ -4,7 +4,7 @@ from frankAllSkyCam import fileManager
 import subprocess
 
 config = ConfigParser()
-config.read(os.path.join(os.path.dirname(__file__), '', 'config.txt'))
+config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt'))
 logFolder = str(config['system']['logFolder'])
 myfile = str(config['system']['outputLocalWebFile'])
 maxMinutes = int(config['system']['rebootAfter'])
