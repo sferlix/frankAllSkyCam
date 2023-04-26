@@ -38,9 +38,9 @@ os.mkdir(homepath+"/frankAllSkyCam/img")
 os.mkdir(homepath+"/frankAllSkyCam/logs")
 
 dest1 = homepath +'/frankAllSkyCam/config.txt'
-oldf1 = 'helper/config.txt'
+oldf1 = 'frankAllSkyCam/helper/config.txt'
 shutil.copy(oldf1, dest1)
 
 dest2 = homepath +'/frankAllSkyCam/index.html'
-oldf2 = 'helper/index.html'
+oldf2 = 'frankAllSkyCam/helper/index.html'
 shutil.copy(oldf2, dest2)
