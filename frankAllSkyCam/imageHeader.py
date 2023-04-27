@@ -13,7 +13,8 @@ from configparser import ConfigParser
 import socket
 
 config = ConfigParser()
-config.read(os.path.expanduser("~")+"/frankAllSkyCam/config.txt")
+pu=os.path.expanduser('~')+'/frankAllSkyCam/'
+config.read(pu+'/config.txt')
 latitude  = float(config['site']['latitude'])
 longitude = float(config['site']['longitude'])
 timeZone = str(config['site']['time_zone'])
@@ -204,7 +205,10 @@ def getHeader(datacalcolo):
        else:
           esposizione = 0
 
-       e = getSQM()
+       e=0
+
+       if SQM_LE == "y":
+          e = getSQM()
 
        if e> 0:
           esposizione = e * 1000000
@@ -454,12 +458,6 @@ def getMoonReduction(datacalcolo, isDebug, logLevel):
 
 
 def riduzioneQuadratica(deltaminuti, durata):
-
-
-
-
-
-
     #riduzione_quadratica = round(math.exp(-(deltaminuti**2)/(2*(durata/3)**2))  ,4)
     rid =  math.exp(-(deltaminuti**2)/(2*(durata/3)**2))
     return rid
@@ -472,35 +470,34 @@ def stampa(stringa, isDebug, logLevel, logActual):
     return
 
 def readSQM():
-	sqm = '--.--'
-	try:
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		#print(SQM_LE_IP + ":" + str(int(SQM_LE_PORT)))
-		s.connect((SQM_LE_IP,int(SQM_LE_PORT)))
-		#print('connected')
-		s.sendall(b'rx')
-		msg = ''
-		while len(msg) < 55:
-		  chunk = s.recv(55-len(msg))
-		  if chunk == '':
-		     print("socket connection broken")
-		  msg = msg + str(chunk)
-		#print(msg)
-		sqm=msg[5:10]
-		#print(sqm)
-		s.close()
-		if SQM_WRITE_LOG=='y':
-			if int(sqm[0:2]) > 0:
-				tz = timezone(timeZone)
-				d = datetime.now(tz)
-				line = d.strftime("%d/%m/%Y %H:%M") + "," + sqm + "\n"
-				f = open(SQM_FOLDER + "/sqm.csv", "a+")
-				f.write(line)
-				f.close()
-	except:
-		print('aaa')
-	return sqm
-
+    sqm = '--.--'
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #print(SQM_LE_IP + ":" + str(int(SQM_LE_PORT)))
+        s.connect((SQM_LE_IP,int(SQM_LE_PORT)))
+        #print('connected')
+        s.sendall(b'rx')
+        msg = ''
+        while len(msg) < 55:
+          chunk = s.recv(55-len(msg))
+          if chunk == '':
+             print("socket connection broken")
+          msg = msg + str(chunk)
+        #print(msg)
+        sqm=msg[5:10]
+        #print(sqm)
+        s.close()
+        if SQM_WRITE_LOG=='y':
+            if int(sqm[0:2]) > 0:
+                tz = timezone(timeZone)
+                d = datetime.now(tz)
+                line = d.strftime("%d/%m/%Y %H:%M") + "," + sqm + "\n"
+                f = open(SQM_FOLDER + "/sqm.csv", "a+")
+                f.write(line)
+                f.close()
+    except:
+        print('aaa')
+    return sqm
 
 def getSQM():
    try:
