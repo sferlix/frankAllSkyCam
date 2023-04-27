@@ -13,7 +13,7 @@ from configparser import ConfigParser
 import socket
 
 config = ConfigParser()
-config.read(os.path.expanduser("~")+"/frankAllSkyCam/", '', 'config.txt')
+config.read(os.path.expanduser("~")+"/frankAllSkyCam/config.txt")
 latitude  = float(config['site']['latitude'])
 longitude = float(config['site']['longitude'])
 timeZone = str(config['site']['time_zone'])
@@ -63,6 +63,7 @@ def getTimes():
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >/dev/null 2>&1\n")
               f.write("0 0 1 1 * python3 -m frankAllSkyCam.crontab >/dev/null 2>&1\n")
               f.close()
+              os.system("crontab -l > " + os.path.expanduser("~")+"/frankAllSkyCam/oldcrontab.txt")
               os.system("crontab -r")
               os.system("crontab ./AllSkyCrontab.txt")
               os.system("rm ./AllSkyCrontab.txt")
