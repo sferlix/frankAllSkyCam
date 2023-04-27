@@ -1,7 +1,6 @@
 import os
 import shutil
 from distutils.core import setup
-from frankAllSkyCam import crontab
 
 homepath = os.path.expanduser("~")
 setup(
