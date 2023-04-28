@@ -6,13 +6,13 @@ homepath = os.path.expanduser("~")
 setup(
   name = 'frankAllSkyCam',         # How you named your package folder (MyLib)
   packages = ['frankAllSkyCam'],   # Chose the same as "name"
-  version = '3.8',      # Start with a small number and increase it with every change you make
+  version = '4.2',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',   # Give a short description about your library
   author = 'Francesco Sferlazza',                   # Type in your name
   author_email = 'sferlazza@gmail.com',      # Type in your E-Mail
   url = 'https://github.com/sferlix/frankAllSkyCam',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/3.8.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/4.2.tar.gz',    # I explain this later on
   keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'pytz',
@@ -38,8 +38,11 @@ if os.path.exists(homepath+"/frankAllSkyCam") == False:
 if os.path.exists(homepath+"/frankAllSkyCam/img") == False:
     os.mkdir(homepath+"/frankAllSkyCam/img")
 
-if os.path.exists(homepath+"/frankAllSkyCam/logs") == False:
-    os.mkdir(homepath+"/frankAllSkyCam/logs")
+if os.path.exists(homepath+"/frankAllSkyCam/log") == False:
+    os.mkdir(homepath+"/frankAllSkyCam/log")
+
+if os.path.exists(homepath+"/frankAllSkyCam/sqm") == False:
+    os.mkdir(homepath+"/frankAllSkyCam/sqm")
 
 sorg1 = 'frankAllSkyCam/helper/config.txt'
 dest1 = homepath +'/frankAllSkyCam/config.txt'
@@ -49,4 +52,3 @@ sorg2 = 'frankAllSkyCam/helper/index.html'
 dest2 = homepath +'/frankAllSkyCam/index.html'
 shutil.copy(sorg2, dest2)
 
-#s = crontab.getTimes()
