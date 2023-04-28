@@ -1,7 +1,14 @@
 # frankAllSkyCam
 AllSkyCam software 
 here is what you need to do in order to install:
-#1. PREREQUISITES:  (not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. The important point is that your OS should have libcamera software (included in the last Raspberry OS).The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command: libcamera-jpeg -o test.jpg --immediate -n
+
+#1. PREREQUISITES
+(not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. 
+The important point is that your OS should have libcamera software (included in the last Raspberry OS).
+The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
+
+libcamera-jpeg -o test.jpg --immediate -n
+
 you should find test.jpg in your folder
 Supposing you are fine with this pre-requisite, let's start
 
@@ -9,20 +16,32 @@ Supposing you are fine with this pre-requisite, let's start
 sudo apt update
 sudo apt upgrade
 
-#3. install the software needed:a) Apache (web server)sudo apt install apache2 -y
-a) pip (should be already installed)sudo apt install python3-pip
+#3. install the software needed:
+a) Apache (web server)
+sudo apt install apache2 -y
 
-c) the allSkyCam softwarepip3 install frankAllSkyCam
+b) pip (should be already installed)
+sudo apt install python3-pip
+
+c) the allSkyCam software
+pip3 install frankAllSkyCam
 
 after the installation, go to the AllSkyCam directory:
+
 cd /home/pi/frankAllSkyCam
+
 then, type these 2 commands:
-sudo mkdir /var/www/html/imgsudo mv index.html /var/www/html/
+
+sudo mkdir /var/www/html/img
+sudo mv index.html /var/www/html/
+
 installation is done.
 
 #configure your system
+
 now, you should configure your system by editing the single config.txt file:
 /home/pi/frankAllSkyCam/config.txt
+
 I would suggest to update at minimum the following parameters:
 inte = <name of your AllSkyCam that will be on top-center of the allSky image>
 latitude = 44.73
@@ -35,6 +54,7 @@ write_log = y
 
 in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.To edit the config.txt, you could use the nano editor:
 nano config.txt
+  
 parameters to configureFTP_server = <your_ftpserver.com>
 FTP_login = <youruser>
 FTP_pass = <yourpass>
@@ -61,9 +81,10 @@ if it works, you should find the generated jpgs:
 2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
 3. on your remote FTP, in case you have configured it
 ==============================
-Last step. If everything works, just make everything automatic. Type this command.
+Last step. If everything works, just make everything automatic. Type this command:
 
 python3 -m frankAllSkyCam.crontab
+  
 ==================================
 Done !
 enjoy it !
