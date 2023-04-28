@@ -2,7 +2,7 @@
 AllSkyCam software 
 here is what you need to do in order to install:
 
-#1. PREREQUISITES
+# 1. PREREQUISITES
 (not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. 
 The important point is that your OS should have libcamera software (included in the last Raspberry OS).
 The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
@@ -12,11 +12,11 @@ libcamera-jpeg -o test.jpg --immediate -n
 you should find test.jpg in your folder
 Supposing you are fine with this pre-requisite, let's start
 
-#2. Ensure everything is updated:
+# 2. Ensure everything is updated:
 sudo apt update
 sudo apt upgrade
 
-#3. install the software needed:
+# 3. install the software needed:
 a) Apache (web server)
 sudo apt install apache2 -y
 
@@ -37,7 +37,7 @@ sudo mv index.html /var/www/html/
 
 installation is done.
 
-#configure your system
+# 4. configure your system
 
 now, you should configure your system by editing the single config.txt file:
 /home/pi/frankAllSkyCam/config.txt
@@ -69,8 +69,8 @@ FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
 if you do not want to use a remote website just do this:
 isFTP=False
 
-=================================
-Test to check if it works:
+ # 5. Test to check if it works:
+
 from command line, just type:
 
 python3 -m frankAllSkyCam
@@ -80,11 +80,15 @@ if it works, you should find the generated jpgs:
 1. via browser, test http://<your_raspberry_IP>
 2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
 3. on your remote FTP, in case you have configured it
+  
 ==============================
-Last step. If everything works, just make everything automatic. Type this command:
+  
+Last step. If everything works, just make everything automatic. 
+Type this command:
 
 python3 -m frankAllSkyCam.crontab
   
-==================================
+==============================
+  
 Done !
 enjoy it !
