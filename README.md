@@ -64,17 +64,26 @@ in case you publish the allskycam and startrail images and timelapses videos in 
   
 parameters to configureFTP_server = <your_ftpserver.com>
 FTP_login = <youruser>
+  
 FTP_pass = <yourpass>
+  
 FTP_uploadFolder =<your upload dir>
+  
 FTP_filenameAllSkyImgJPG = allskycam
+  
 FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
+  
 FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
+ 
 
 allskycam_night.mp4 will be generated if nightTL = True
+ 
 allskycam_24h.mp4 will be generated if fullTL = True
 
 if you do not want to use a remote FTP just set this way:
+  
 isFTP=False
+  
 
  # 5. Test to check if it works:
 
