@@ -8,6 +8,7 @@ setup(
   description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',   # Give a short description about your library
   author = 'Francesco Sferlazza',                   # Type in your name
   author_email = 'sferlazza@gmail.com',      # Type in your E-Mail
+  include_package_data=True,
   url = 'https://github.com/sferlix/frankAllSkyCam',   # Provide either the link to your github or to your website
   download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/5.1.tar.gz',    # I explain this later on
   keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],   # Keywords that define your package best
