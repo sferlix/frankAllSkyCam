@@ -9,7 +9,7 @@ The former version (raspistill) is not supported.If you want to check if you hav
 
 libcamera-jpeg -o test.jpg --immediate -n
 
-you should find test.jpg in your folder
+you should find test.jpg in your current folder
 Supposing you are fine with this pre-requisite, let's start
 
 # 2. Ensure everything is updated:
@@ -36,6 +36,7 @@ cd /home/pi/frankAllSkyCam
 then, type these 2 commands:
 
 sudo mkdir /var/www/html/img
+
 sudo mv index.html /var/www/html/
 
 installation is done.
@@ -44,6 +45,10 @@ installation is done.
 
 now, you should configure your system by editing the single config.txt file:
 /home/pi/frankAllSkyCam/config.txt
+
+To edit the config.txt, you could use the nano editor:
+
+nano config.txt
 
 I would suggest to update at minimum the following parameters:
 inte = <name of your AllSkyCam that will be on top-center of the allSky image>
@@ -55,21 +60,20 @@ in case you own the SQM-LE, turn the use_sqm =n in 'y' and put the IP address of
 ip_address = <ip_address_of_the_SQM_LE>port = 10001
 write_log = y
 
-in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.To edit the config.txt, you could use the nano editor:
-nano config.txt
+in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
   
 parameters to configureFTP_server = <your_ftpserver.com>
 FTP_login = <youruser>
 FTP_pass = <yourpass>
-FTP_uploadFolder =<your upload dir>FTP_filenameAllSkyImgJPG = allskycam
+FTP_uploadFolder =<your upload dir>
+FTP_filenameAllSkyImgJPG = allskycam
 FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
+FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
 
 allskycam_night.mp4 will be generated if nightTL = True
 allskycam_24h.mp4 will be generated if fullTL = True
 
-FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
-
-if you do not want to use a remote website just do this:
+if you do not want to use a remote FTP just set this way:
 isFTP=False
 
  # 5. Test to check if it works:
