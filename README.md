@@ -10,15 +10,19 @@ The former version (raspistill) is not supported.If you want to check if you hav
 libcamera-jpeg -o test.jpg --immediate -n
 
 you should find test.jpg in your current folder
+
 Supposing you are fine with this pre-requisite, let's start
 
 # 2. Ensure everything is updated:
+
 sudo apt update
+
 sudo apt upgrade
 
 # 3. install the software needed:
 
 a) Apache (web server). it is not really mandatory. If you would skip this, change the parameter in the config.txt (see below)
+
 outputLocalWebFile = /home/pi/frankAllSkyCam/img/skycam.jpg
 
 sudo apt install apache2 -y
