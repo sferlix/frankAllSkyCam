@@ -26,6 +26,10 @@ picture_rotation = str(config['resolution']['picture_rotation'])
 additional_params = str(config['libcamera']['additional_params'])
 
 font_size = int(config['font']['font_size'])
+font_colorR = int(config['font']['font_colorR'])
+font_colorG = int(config['font']['font_colorG'])
+font_colorB = int(config['font']['font_colorB'])
+font_color = [font_colorR,font_colorG,font_colorB]
 
 isFTP = str(config['ftp']['isFTP'])=='True'
 FTP_server = str(config['ftp']['FTP_server'])
@@ -64,7 +68,7 @@ def main():
     comando += " -n --width " + str(horiz) + " --height "+ str(vert) + " --immediate "
 
     if esposiz >0:
-       comando +=" --gain 18 --awbgains 2.2,2.2 --shutter " + str(int(esposiz)) + " "
+       comando +=" --shutter " + str(int(esposiz)) + " "
        comando += additional_params
     else:
        comando += " --metering average "
@@ -79,7 +83,7 @@ def main():
 
        print("Image captured")
        # print watermark
-       drawtext.printWatermark(s, nomefile, font_size)
+       drawtext.printWatermark(s, nomefile, font_size, font_color)
 
        textcommand = "touch " + logFolder +  "/alive.txt"
        os.system(textcommand)

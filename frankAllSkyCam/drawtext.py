@@ -4,7 +4,7 @@ from PIL import ImageFont
 from PIL import ImageDraw
 
 
-def printWatermark(s, nomefile, font_size):
+def printWatermark(s, nomefile, font_size, fc):
     data      = s[0]
     ora       = s[1]
     inte      = s[2]
@@ -23,7 +23,10 @@ def printWatermark(s, nomefile, font_size):
     photo = Image.open(nomefile)
     drawing = ImageDraw.Draw(photo)
     font = ImageFont.truetype("DejaVuSerif.ttf", font_size)
-    colore = (255, 255, 255)
+    if len(fc)==0:
+       fc=[255,255,255]
+	   
+    colore = (fc[0], fc[1],fc[2])
 
     pos=(5, 0)
     stringa = data + "\n" + ora

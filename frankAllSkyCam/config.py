@@ -7,13 +7,13 @@
 ########################################
 
 [system]
-# Images main directory - DO NOT CHANGE IT
+# where will be stored images - relative path to frankAllSkyCam
 otuputFolder= img
-
-# Log directory - DO NOT CHANGE IT
+# 
+# directory where to save logs
 logFolder = log
 
-# SQM-LE logs - DO NOT CHANGE IT
+# directory  where to save SQM LE readings
 sqmFolder = sqm
 
 # web folder where to save the skycam.jpg
@@ -22,8 +22,8 @@ outputLocalWebFile = /var/www/html/img/skycam.jpg
 #how many days you want to keep jpgs
 days_retention = 3
 
-#watchdog will reboot if after 15 minutes no <home_path>/<log_path>/alive.txt has been generated 
-rebootAfter = 15
+#watchdog will reboot if after x minutes no image has been generated 
+rebootAfter = 5
 
 [site]
 #the following label will be printed on the image
@@ -40,8 +40,10 @@ picture_rotation = 0
 
 [libcamera]
 # may personalize the libcamara params. 
-# please DO NOT set --shutter, --gain, --awbgains --immediate
-additional_params = ""
+# please DO NOT set --shutter, --immediate
+# parameters will be used only when exposure > 0
+additional_params = "--gain 18 --awbgains 2.2,2.2"
+
 
 [timelapse]
 # if True, timelapse from sunset to sunrise will be generated  Otherwise, not.
@@ -60,9 +62,14 @@ ffmpeg1 = -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p
 ffmpeg2 = 
 ffmpeg3 = 
  
+
 [font]
 #when 1024x768 you can increase it
 font_size = 18
+font_colorR = 0
+font_colorG = 255
+font_colorB = 255
+
 
 [exposure]
 #night exposure in seconds
@@ -102,10 +109,10 @@ dusk = 0
 isFTP=True
 
 # ftp parameters allSkyCam image will be uploaded on a 
-FTP_server = myftpserver.com
-FTP_login = myuser
-FTP_pass = mypass
-FTP_uploadFolder =/public/frankAllSkyCam/
+FTP_server=meteobrallo.com
+FTP_login=meteobra
+FTP_pass=pu3lla
+FTP_uploadFolder =/public_html/webcam/allsky
 
 # allskycam.jpg will be generated on the FTP server
 FTP_filenameAllSkyImgJPG = allskycam 
@@ -119,7 +126,7 @@ FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
 
 [sqm_le]
 # if you want to use SQM LE then use_sqm = y Otherwise, not.
-use_sqm = n
+use_sqm = y
 ip_address = 192.168.2.59
 port = 10001
 write_log = y
