@@ -14,7 +14,6 @@ frankAllSkyCam/test_sqm.py
 frankAllSkyCam/test_suncalc.py
 frankAllSkyCam/timelapse.py
 frankAllSkyCam/watchDog.py
-frankAllSkyCam/helper/config.txt
-frankAllSkyCam/helper/index.html
-test/test_sqm.py
-test/test_suncalc.py
+frankAllSkyCam/config.txt
+frankAllSkyCam/index.html
+
