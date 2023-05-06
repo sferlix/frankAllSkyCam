@@ -28,9 +28,11 @@ outputLocalWebFile = /home/pi/frankAllSkyCam/img/skycam.jpg
 sudo apt install apache2 -y
 
 b) pip (should be already installed)
+
 sudo apt install python3-pip
 
 c) the allSkyCam software
+
 pip3 install frankAllSkyCam
 
 after the installation, go to the AllSkyCam directory:
