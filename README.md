@@ -79,7 +79,7 @@ FTP_login = your_user
   
 FTP_pass = your_password
   
-FTP_uploadFolder =<your upload dir>
+FTP_uploadFolder =your_upload_dir
   
 FTP_filenameAllSkyImgJPG = allskycam
   
