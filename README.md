@@ -75,9 +75,9 @@ write_log = y
 in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
   
 parameters to configureFTP_server = <your_ftpserver.com>
-FTP_login = <youruser>
+FTP_login = your_user
   
-FTP_pass = <yourpass>
+FTP_pass = your_password
   
 FTP_uploadFolder =<your upload dir>
   
