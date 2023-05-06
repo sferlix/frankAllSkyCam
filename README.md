@@ -44,6 +44,7 @@ installation is done.
 # 4. configure your system
 
 now, you should configure your system by editing the single config.txt file:
+
 /home/pi/frankAllSkyCam/config.txt
 
 To edit the config.txt, you could use the nano editor:
@@ -57,8 +58,13 @@ longitude = 9.31
 time_zone = Europe/Rome
 
 in case you own the SQM-LE, turn the use_sqm =n in 'y' and put the IP address of the SQM-LE.use_sqm = n
-ip_address = <ip_address_of_the_SQM_LE>port = 10001
+  
+ip_address = <ip_address_of_the_SQM_LE>
+  
+port = 10001
+  
 write_log = y
+  
 
 in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
   
