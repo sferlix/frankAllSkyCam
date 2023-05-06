@@ -4,12 +4,12 @@ setup.py
 frankAllSkyCam/__init__.py
 frankAllSkyCam/__main__.py
 frankAllSkyCam/allskycamdelete.py
-frankAllSkyCam/config.app
+frankAllSkyCam/config.py
 frankAllSkyCam/crontab.py
 frankAllSkyCam/drawtext.py
 frankAllSkyCam/fileManager.py
 frankAllSkyCam/imageHeader.py
-frankAllSkyCam/index.html
+frankAllSkyCam/index.py
 frankAllSkyCam/startrail.py
 frankAllSkyCam/suncalc2.py
 frankAllSkyCam/test_sqm.py
