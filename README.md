@@ -1,6 +1,6 @@
-# frankAllSkyCam
-AllSkyCam software 
-here is what you need to do in order to install:
+# frankAllSkyCam - AllSkyCam software 
+
+Here is what you need to install
 
 # 1. PREREQUISITES
 (not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. 
@@ -25,31 +25,37 @@ a) Apache (web server). it is not really mandatory. If you would skip this, chan
 
 outputLocalWebFile = /home/pi/frankAllSkyCam/img/skycam.jpg
 
+if you want to use your Raspberry Pi as web server, then install Apache:
+
 sudo apt install apache2 -y
 
-b) pip (should be already installed)
+b) Install pip (should be already in you raspberry)
 
 sudo apt install python3-pip
 
-c) the allSkyCam software
+c) Here is the only, single command you need to install the frankAllSkyCam software
 
 pip3 install frankAllSkyCam
 
-after the installation, go to the AllSkyCam directory:
+installation is done.
 
-cd /home/pi/frankAllSkyCam
 
-then, type these 2 commands:
+if you are going to use your Raspberry as a web server to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the all sky image.
+
+To do so, type these 2 commands:
 
 sudo mkdir /var/www/html/img
 
-sudo mv index.html /var/www/html/
+sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 
-installation is done.
+
 
 # 4. configure your system
 
-now, you should configure your system by editing the single config.txt file:
+type this command:
+python3 -m frankAllSkyCam
+
+now, you should be able to configure your system by editing the single config.txt file:
 
 /home/pi/frankAllSkyCam/config.txt
 
