@@ -2,6 +2,21 @@
 
 Here is what you need to install
 
+# pip3 install frankAllSkyCam
+
+installation is done.
+Launch the program:
+
+python3 -m frankAllSkyCam
+
+to configure your system, edit the single config.txt like this:
+
+nano /home/pi/frankAllSkyCam/config.txt
+
+details below. Enjoy !
+
+
+
 # 1. PREREQUISITES
 (not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. 
 The important point is that your OS should have libcamera software (included in the last Raspberry OS).
@@ -33,12 +48,6 @@ b) Install pip (should be already in you raspberry)
 
 sudo apt install python3-pip
 
-c) Here is the only, single command you need to install the frankAllSkyCam software
-
-pip3 install frankAllSkyCam
-
-installation is done.
-
 
 if you are going to use your Raspberry as a web server to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the all sky image.
 
@@ -52,10 +61,8 @@ sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 
 # 4. configure your system
 
-type this command:
-python3 -m frankAllSkyCam
 
-now, you should be able to configure your system by editing the single config.txt file:
+to configure your system, edit the single config.txt file:
 
 /home/pi/frankAllSkyCam/config.txt
 
