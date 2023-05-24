@@ -130,7 +130,18 @@ Type this command:
 python3 -m frankAllSkyCam.crontab
   
 ==============================
+ 
   
+# 6. For expert users 
+ 
+You can customize the exposure (secs) depending on your SQM values. All you need is to edit the file
   
+  /home/pi/frankAllSkyCam/sqmexp.csv
+  
+ you ust need to change the exposure for every given SQM value. If you wish, you can also add more pairs (sqm values, secs).
+ The software would predict the exact exposure by interpolating with existing values (polynomial regresssion grade=3).
+ You may want calibrate exposures and combine it with your desired --gain and --awbgains options (in config.txt)  
+  
+ ================================== 
 Done !
 enjoy it !
