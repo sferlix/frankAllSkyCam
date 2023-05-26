@@ -1,6 +1,6 @@
 # frankAllSkyCam - AllSkyCam software 
 
-Here is what you need to install
+Here is what you need to install, after ensuring to satisfy requirements (see below):
 
 # pip3 install frankAllSkyCam
 
@@ -18,8 +18,8 @@ details below. Enjoy !
 
 
 # 1. PREREQUISITES
-(not really mandatory) prepare a clean SD with the last version of raspbian. Lite version, without desktop is fine. 
-The important point is that your OS should have libcamera software (included in the last Raspberry OS).
+prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
+The important point is that your OS must have the libcamera software (included in the last Raspberry OS).
 The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
 
 libcamera-jpeg -o test.jpg --immediate -n
@@ -34,9 +34,9 @@ sudo apt update
 
 sudo apt upgrade
 
-# 3. install the software needed:
+# 3. install the software eventually needed:
 
-a) Apache (web server). it is not really mandatory. If you would skip this, change the parameter in the config.txt (see below)
+a) Apache (web server). it is not really mandatory. If your Raspberry will not be also used as web server, skip this point.
 
 outputLocalWebFile = /home/pi/frankAllSkyCam/img/skycam.jpg
 
@@ -48,8 +48,13 @@ b) Install pip (should be already in you raspberry)
 
 sudo apt install python3-pip
 
+Now you can install frankAllSkyCam
 
-if you are going to use your Raspberry as a web server to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the all sky image.
+
+pip3 install frankAllSkyCam
+
+before configuring, please note that,
+if you are going to use your Raspberry as a web server, to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the all sky image.
 
 To do so, type these 2 commands:
 
