@@ -38,9 +38,8 @@ sudo apt upgrade
 
 a) Apache (web server). it is not really mandatory. If your Raspberry will not be also used as web server, skip this point.
 
-outputLocalWebFile = /home/pi/frankAllSkyCam/img/skycam.jpg
 
-if you want to use your Raspberry Pi as web server, then install Apache:
+If you want to use your Raspberry Pi as web server, then install Apache:
 
 sudo apt install apache2 -y
 
@@ -48,13 +47,16 @@ b) Install pip (should be already in you raspberry)
 
 sudo apt install python3-pip
 
+
+done !
+
 Now you can install frankAllSkyCam
 
 
 pip3 install frankAllSkyCam
 
 before configuring, please note that,
-if you are going to use your Raspberry as a web server, to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the all sky image.
+if you are going to use your Raspberry as a web server, to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the allSky image.
 
 To do so, type these 2 commands:
 
@@ -76,21 +78,23 @@ To edit the config.txt, you could use the nano editor:
 nano config.txt
 
 I would suggest to update at minimum the following parameters:
-inte = <name of your AllSkyCam that will be on top-center of the allSky image>
+inte = <name of your AllSkyCam that will be printed on top-center of the allSky images>
 latitude = 44.73
 longitude = 9.31
 time_zone = Europe/Rome
 
-in case you own the SQM-LE, turn the use_sqm =n in 'y' and put the IP address of the SQM-LE.use_sqm = n
+in case you own the SQM-LE, turn the use_sqm =n in y and put the IP address and port of the SQM-LE.
+  
+use_sqm = y
   
 ip_address = <ip_address_of_the_SQM_LE>
   
 port = 10001
   
-write_log = y
+write_log = n
   
 
-in case you publish the allskycam and startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
+in case you publish the allskycam, startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
   
 parameters to configureFTP_server = <your_ftpserver.com>
 FTP_login = your_user
@@ -127,6 +131,8 @@ if it works, you should find the generated jpgs:
 2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
 3. on your remote FTP, in case you have configured it
   
+  
+ Config.txt also contains several othe options.
 ==============================
   
 Last step. If everything works, just make everything automatic. 
