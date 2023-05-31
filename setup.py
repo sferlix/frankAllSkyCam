@@ -1,27 +1,26 @@
 from distutils.core import setup
 
 setup(
-  name = 'frankAllSkyCam',
-  packages = ['frankAllSkyCam'],
-  version = '7.7',
-  license='MIT',
-  description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',
-  author = 'Francesco Sferlazza',
-  author_email = 'sferlazza@gmail.com',
-  url = 'https://github.com/sferlix/frankAllSkyCam',
-  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/7.7.tar.gz',
-  keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],
-  install_requires=[
+  name = 'frankAllSkyCam',         # How you named your package folder (MyLib)
+  packages = ['frankAllSkyCam'],   # Chose the same as "name"
+  version = '7.7',      # Start with a small number and increase it with every change you make
+  license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
+  description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',   # Give a short description about your library
+  author = 'Francesco Sferlazza',                   # Type in your name
+  author_email = 'sferlazza@gmail.com',      # Type in your E-Mail
+  url = 'https://github.com/sferlix/frankAllSkyCam',   # Provide either the link to your github or to your website
+  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/7.7.tar.gz',    # I explain this later on
+  keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],   # Keywords that define your package best
+  install_requires=[            # I get to this in a second
           'pytz',
           'numpy',
-          'pandas',
       ],
   classifiers=[
-    'Development Status :: 4 - Beta',
-    'Intended Audience :: Developers',
+    'Development Status :: 4 - Beta',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
+    'Intended Audience :: Developers',      # Define that your audience are developers
     'Topic :: Software Development :: Build Tools',
-    'License :: OSI Approved :: MIT License',
-    'Programming Language :: Python :: 3',
+    'License :: OSI Approved :: MIT License',   # Again, pick a license
+    'Programming Language :: Python :: 3',      #Specify which pyhton versions that you want to support
     'Programming Language :: Python :: 3.4',
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
@@ -29,6 +28,4 @@ setup(
     'Programming Language :: Python :: 3.9',
   ],
 )
-
-
 
