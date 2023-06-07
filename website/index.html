@@ -1,0 +1,51 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta http-equiv="refresh" content="60" />
+    <link rel="stylesheet" href="css/allsky.css">	
+    <script src="https://code.jquery.com/jquery-1.10.1.min.js"></script> 
+    <script src="js/stuquery.js"></script>  
+    <script src="js/virtualsky.js" type="text/javascript"></script>
+    <script src="js/config.js"></script> 
+    <script src="js/common.js"></script>  
+ 
+</head>	
+<body>
+        <div id="navigator">
+	<ul id="nav">
+		<li class="nav_tab">
+			<a href="javascript:toggleSkyMap();"><p>Star Map</p></a>
+		</li>
+		<li class="nav_tab">
+			<a href="timelapse.html"><p>Timelapse</p></a>
+		</li>
+        	<li class="nav_tab">
+			<a href="startrail.html"><p>Startrail</p></a>
+		</li>	
+				
+		<li class="nav_tab">
+			<a href="location.html"><p>Location</p></a>
+		</li>
+	</ul>
+        </div>	
+	<div class="menu-icon">			
+		<div class="line_one"></div>
+ 		<div class="line_two"></div>
+  		<div class="line_three"></div>  			
+	</div>
+	<p class="menu-text"></p>
+	<div style="align:middle;width:"100%">
+        <div id="menubar" class="menubar">
+           <div id="logo" class ="logo" class="logo">ADARA - powered by frankAllSkyCam</div>
+        </div> 
+       	<a href="javascript:toggleSkyMap();">
+        <div id="allsky" class="allsky">    
+               <div id="starmap" style="width:1000px;height:750px;overflow: hidden;"></div> 
+	</div>
+       	</a>
+	</div>
+</body>
+</html>
