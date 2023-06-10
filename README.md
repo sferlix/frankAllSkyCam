@@ -138,7 +138,8 @@ Type this command:
 `python3 -m frankAllSkyCam.crontab`
   
 it will install all the jobs ! 
-** Enjoy it ! **
+
+### Enjoy it !
  
   
 ## For expert users 
