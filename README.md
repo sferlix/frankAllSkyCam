@@ -60,10 +60,11 @@ if you are going to use your Raspberry as a web server, to present your allSky i
 
 To do so, type these 2 commands:
 
-`sudo mkdir /var/www/html/img
+```
+sudo mkdir /var/www/html/img
 
-sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/`
-
+sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
+```
 
 
 # 4. configure your system
@@ -79,11 +80,13 @@ nano config.txt
 
 I would suggest to update at minimum the following parameters:
 
-`inte = <name of your AllSkyCam that will be printed on top-center of the allSky images>
+```
+inte = <name of your AllSkyCam that will be printed on top-center of the allSky images>
 latitude = 44.73
 longitude = 9.31
-time_zone = Europe/Rome`
+time_zone = Europe/Rome
 
+```
 in case you own the SQM-LE, turn the use_sqm =n in y and put the IP address and port of the SQM-LE.
   
 `use_sqm = y
