@@ -19,7 +19,7 @@ details below. Enjoy !
 
 # 1. PREREQUISITES
 prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
-The important point is that your OS must have the libcamera software (included in the last Raspberry OS).
+The important point is that your OS must have the **libcamera** software (included in the last Raspberry OS).
 The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
 
 `libcamera-jpeg -o test.jpg --immediate -n`
@@ -30,55 +30,53 @@ Supposing you are fine with this pre-requisite, let's start
 
 # 2. Ensure everything is updated:
 
-`sudo apt update
-
-sudo apt upgrade`
-
-# 3. install the software eventually needed:
-
-a) Apache (web server). it is not really mandatory. If your Raspberry will not be also used as web server, skip this point.
-
-
-If you want to use your Raspberry Pi as web server, then install Apache:
-
-`sudo apt install apache2 -y`
-
-b) Install pip (should be already in you raspberry)
+```
+sudo apt update
+sudo apt upgrade
+```
+check you have pip installed (should be already in you raspberry):
 
 `sudo apt install python3-pip`
-
 
 done !
 
 **Now you can install frankAllSkyCam**
 
-
 `pip3 install frankAllSkyCam`
 
-before configuring, please note that,
-if you are going to use your Raspberry as a web server, to present your allSky images, after the installation, you need to create the images folder in your web server. I also provide you a very basic html page to show the allSky image.
+Now you have 2 options:
 
-To do so, type these 2 commands:
+##1. Use your Raspberry as a web server
+Then, you need to have Apache installed. To do so, type this command:
 
+`sudo apt install apache2 -y`
+
+create the images folder in your web server.
 ```
 sudo mkdir /var/www/html/img
+```
 
+I also provide you a very basic html page to show the allSky image. just move it into your local web server:
+
+```
 sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 ```
 
 
-# 4. configure your system
+##2. Upload your AllSkyCam to a webserver (e.g., via FTP)
+In this case you need to configure your FTP parameters in the config.txt file (see below)
 
+# 4. Configure your system
 
-to configure your system, edit the single config.txt file:
+To configure your system, edit the single config.txt file:
 
 `/home/pi/frankAllSkyCam/config.txt`
 
 To edit the config.txt, you could use the nano editor:
 
-nano config.txt
+`nano config.txt`
 
-I would suggest to update at minimum the following parameters:
+I would suggest to configure at least the following parameters:
 
 ```
 inte = <name of your AllSkyCam that will be printed on top-center of the allSky images>
@@ -87,37 +85,30 @@ longitude = 9.31
 time_zone = Europe/Rome
 
 ```
-in case you own the SQM-LE, turn the use_sqm =n in y and put the IP address and port of the SQM-LE.
-  
-`use_sqm = y
-  
-ip_address = <ip_address_of_the_SQM_LE>
-  
-port = 10001
-  
-write_log = n`
-  
+in case you own the SQM-LE, ensure use_sqm =y and put the IP address and port of the SQM-LE:
 
+```
+use_sqm = y 
+ip_address = <ip_address_of_the_SQM_LE>
+port = 10001
+write_log = n
+```
+ 
 in case you publish the allskycam, startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
   
-`parameters to configureFTP_server = <your_ftpserver.com>
+
+```
+parameters to configureFTP_server = <your_ftpserver.com>
 FTP_login = your_user
-  
-FTP_pass = your_password
-  
+FTP_pass = your_password 
 FTP_uploadFolder =your_upload_dir
-  
 FTP_filenameAllSkyImgJPG = allskycam
-  
 FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
-  
 FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
  
-
+```
 allskycam_night.mp4 will be generated if nightTL = True
- 
 allskycam_24h.mp4 will be generated if fullTL = True`
-
 if you do not want to use a remote FTP just set this way:
   
 `isFTP=False`
