@@ -128,9 +128,7 @@ if it works, you should find the generated JPGs:
 1. via browser, test http://<your_raspberry_IP>
 2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
 3. on your remote FTP, in case you have configured it
-  
-
-==============================
+ 
   
 # 6. Last step. 
   
@@ -139,12 +137,11 @@ Type this command:
 
 `python3 -m frankAllSkyCam.crontab`
   
-it will install all the jobs
-  
-==============================
+it will install all the jobs ! 
+** Enjoy it ! **
  
   
-# For expert users 
+## For expert users 
   
 You may want to customize your exposure time, depending on SQM values.
 Pairs "(SQM value, exposure in secs)" are stored in this file:
@@ -158,6 +155,3 @@ So, if you wish to adjust it, you just need to change the exposure for every giv
  You may want calibrate your exposures and combine it with your desired --gain and --awbgains options (in config.txt)  
  In any case, the max exposure value will not exceed the esp_secs parameter in config.txt
   
- ================================== 
-Done !
-enjoy it !
