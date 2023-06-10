@@ -118,6 +118,8 @@ if you do not want to use a remote FTP just set this way:
   
 isFTP=False
   
+There are many other options. The config.txt file is self-explanatory and you can customize many things, including logo, compass, extra-data you may want to print on your AllSkyCam image
+  
 
  # 5. Test to check if it works:
 
@@ -125,36 +127,37 @@ from command line, just type:
 
 python3 -m frankAllSkyCam
 
-if it works, you should find the generated jpgs:
+if it works, you should find the generated JPGs:
 
 1. via browser, test http://<your_raspberry_IP>
 2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
 3. on your remote FTP, in case you have configured it
   
-  
- Config.txt also contains several othe options.
+
 ==============================
   
-Last step. If everything works, just make everything automatic. 
+# 6. Last step. 
+  
+If everything works, just make everything automatic. 
 Type this command:
 
 python3 -m frankAllSkyCam.crontab
   
+it will install all the jobs
+  
 ==============================
  
   
-# 6. For expert users 
- 
-You can customize the exposure (secs) depending on your SQM values. All you need is to edit the file
-  
+# For expert users 
+   
   /home/pi/frankAllSkyCam/sqmexp.csv
   
   (e.g., nano   /home/pi/frankAllSkyCam/sqmexp.csv)
 
  you just need to change the exposure for every given SQM value. If you wish, you can also add more pairs (sqm values, secs).
- The software would predict the exact exposure by interpolating with existing values (polynomial regression grade=3).
+ The software would predict the exposure duration by interpolating among existing values (polynomial regression grade=3).
  You may want calibrate your exposures and combine it with your desired --gain and --awbgains options (in config.txt)  
- In any case, the exposure value will be eventually limited by the esp_secs parameter in config.txt
+ In any case, the max exposure value will not exceed the esp_secs parameter in config.txt
   
  ================================== 
 Done !
