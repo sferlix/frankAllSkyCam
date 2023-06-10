@@ -2,7 +2,9 @@
 
 Here is what you need to install, after ensuring to satisfy requirements (see below):
 
+'''
 # pip3 install frankAllSkyCam
+'''
 
 installation is done.
 Launch the program:
@@ -17,7 +19,7 @@ details below. Enjoy !
 
 
 
-# 1. PREREQUISITES
+# 1. Pre-requisites
 prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
 The important point is that your OS must have the **libcamera** software (included in the last Raspberry OS).
 The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
