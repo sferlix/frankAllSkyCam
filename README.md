@@ -2,9 +2,8 @@
 
 Here is what you need to install, after ensuring to satisfy requirements (see below):
 
-'''
-# pip3 install frankAllSkyCam
-'''
+# `pip3 install frankAllSkyCam`
+
 
 installation is done.
 Launch the program:
