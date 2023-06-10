@@ -46,7 +46,7 @@ done !
 
 Now you have 2 options:
 
-##1. Use your Raspberry as a web server
+## 1. Use your Raspberry as a web server
 Then, you need to have Apache installed. To do so, type this command:
 
 `sudo apt install apache2 -y`
@@ -63,7 +63,7 @@ sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 ```
 
 
-##2. Upload your AllSkyCam to a webserver (e.g., via FTP)
+## 2. Upload your AllSkyCam to a webserver (e.g., via FTP)
 In this case you need to configure your FTP parameters in the config.txt file (see below)
 
 # 4. Configure your system
