@@ -1,6 +1,6 @@
 # frankAllSkyCam - AllSkyCam software 
 
-Here is what you need to install, after ensuring to satisfy requirements (see below):
+Here is what you need to install, *after ensuring to satisfy requirements* (see below):
 
 # `pip3 install frankAllSkyCam`
 
@@ -57,12 +57,12 @@ create the images folder in your web server.
 sudo mkdir /var/www/html/img
 ```
 
-I also provide you a very basic html page to show the allSky image. just move it into your local web server:
+After the installation, you will find a very basic `index.html` page to show the allSky image. just move it into your local web server:
 
 ```
 sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 ```
-
+If you want a real website, please download it from this repository `website` folder. It's just html + Javascript. No php needed.
 
 ## 2. Upload your AllSkyCam to a webserver (e.g., via FTP)
 In this case you need to configure your FTP parameters in the config.txt file (see below)
