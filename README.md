@@ -5,12 +5,13 @@ Here is what you need to install, *after ensuring to satisfy requirements* (see 
 # `pip3 install frankAllSkyCam`
 
 
-installation is done.
+installation is done, but you need to configure according to your preferences.
 Launch the program:
 
 `python3 -m frankAllSkyCam`
 
-to configure your system, edit the single config.txt like this:
+It will create some folders and the config.txt file.
+Edit the single config.txt like this:
 
 `nano /home/pi/frankAllSkyCam/config.txt`
 
@@ -45,30 +46,27 @@ done !
 
 `pip3 install frankAllSkyCam`
 
-Now you have 2 options:
+Now you have need to launch program, so that installation will be complete.
 
-## 1. Use your Raspberry as a web server
-Then, you need to have Apache installed. To do so, type this command:
-
-`sudo apt install apache2 -y`
-
-create the images folder in your web server.
-```
-sudo mkdir /var/www/html/img
-```
-
-After the installation, you will find a very basic `index.html` page to show the allSky image. just move it into your local web server:
+The first execution will create some folders:
 
 ```
-sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
+/home/pi/frankAllSkyCam
+/home/pi/frankAllSkyCam/img
+/home/pi/frankAllSkyCam/log
+/home/pi/frankAllSkyCam/sqm
 ```
-If you want a real website, please download it from this repository `website` folder. It's just html + Javascript. No php needed.
 
-## 2. Upload your AllSkyCam to a webserver (e.g., via FTP)
-In this case you need to configure your FTP parameters in the config.txt file (see below)
+and will generate a couple of files:
 
-# 4. Configure your system
+```
+/home/pi/frankAllSkyCam/config.txt
+/home/pi/frankAllSkyCam/index.html
+```
 
+Now you just need to configure your preferences. See below.
+
+# 2. Configure your system
 To configure your system, edit the single config.txt file:
 
 `/home/pi/frankAllSkyCam/config.txt`
@@ -84,7 +82,6 @@ inte = <name of your AllSkyCam that will be printed on top-center of the allSky 
 latitude = 44.73
 longitude = 9.31
 time_zone = Europe/Rome
-
 ```
 in case you own the SQM-LE, ensure use_sqm =y and put the IP address and port of the SQM-LE:
 
@@ -94,30 +91,60 @@ ip_address = <ip_address_of_the_SQM_LE>
 port = 10001
 write_log = n
 ```
- 
-in case you publish the allskycam, startrail images and timelapses videos in a remote website, you can do it by using an FTP transfer. If this is the case, configure the parameters as explained below.
-  
+
+It's time to decide if your Raspberry Pi will work also as a web server.
+
+## 1. Use your Raspberry as a web server
+Then, you need to have Apache (or other web server) installed. To do so, type this command:
+
+`sudo apt install apache2 -y`
+
+create the images folder in your web server. Example:
 
 ```
-parameters to configureFTP_server = <your_ftpserver.com>
+sudo mkdir /var/www/html/img
+```
+After the installation, you will find a very basic `index.html` page to show just the allSky image. 
+Just move the index.html file into your local web server:
+
+```
+sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
+```
+If you want a "real" website, please download it from this repository `website` folder. It's just html + Javascript. No php needed.
+
+## 2. You will use an external web server.
+
+So you will Upload your AllSkyCam to an external webserver (e.g., via FTP)
+In this case you need to configure your FTP parameters in the config.txt file (see below)
+ 
+```
+isFTP=True
+FTP_server = <your_ftpserver.com>
 FTP_login = your_user
 FTP_pass = your_password 
 FTP_uploadFolder =your_upload_dir
 FTP_filenameAllSkyImgJPG = allskycam
 FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
 FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
- 
 ```
-allskycam_night.mp4 will be generated if nightTL = True
-allskycam_24h.mp4 will be generated if fullTL = True`
-if you do not want to use a remote FTP just set this way:
-  
-`isFTP=False`
-  
+
+According to the above configuration, the allskycam, startrail images and timelapses videos will be uploaded on a remote website, via FTP.
+Of course, if you do not want to use a remote FTP just set `isFTP=False`
+
+An additional parameter will enable / disable the generation of the timelapse:
+
+```
+nightTL = True
+fullTL = True
+```
+
+allskycam_night.mp4 will be generated if `nightTL = True`
+allskycam_24h.mp4 will be generated if `fullTL = True`
+
 There are many other options. The config.txt file is self-explanatory and you can customize many things, including logo, compass, extra-data you may want to print on your AllSkyCam image
   
 
- # 5. Test to check if it works:
+ # 3. Test to check if it works:
 
 from command line, just type:
 
@@ -130,7 +157,7 @@ if it works, you should find the generated JPGs:
 3. on your remote FTP, in case you have configured it
  
   
-# 6. Last step. 
+# 4. Last step. 
   
 If everything works, just make everything automatic. 
 Type this command:
