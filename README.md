@@ -5,12 +5,12 @@ Here is what you need to install, *after ensuring to satisfy requirements* (see 
 # `pip3 install frankAllSkyCam`
 
 
-installation is done, but you need to configure according to your preferences.
-Launch the program:
+installation is done, but you still need to configure some parameters, according to your preferences.
+To do so, launch the program:
 
 `python3 -m frankAllSkyCam`
 
-It will create some folders and the config.txt file.
+It will create some folders and the config.txt file. Now, you can start the configuration.
 Edit the single config.txt like this:
 
 `nano /home/pi/frankAllSkyCam/config.txt`
