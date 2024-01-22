@@ -8,6 +8,7 @@ import time
 import os
 
 from os import path
+from frankAllSkyCam import moon
 
 def saveToFTP(isFTP,nomefile,FTP_server,FTP_login,FTP_pass,FTP_fileName):
    if not isFTP:
@@ -55,7 +56,7 @@ def getConfigFileName():
     moonFile = homePath + "/frankAllSkyCam/moon.png"
     logoFile = homePath + "/frankAllSkyCam/logo.png"
     compFile = homePath + "/frankAllSkyCam/compass.png"
-
+    phaseFile= homePath + "/frankAllSkyCam/phase.png"
 
     if not os.path.isfile(fileName):
        #ensure folders do exist only if config.txt is not existing
@@ -68,12 +69,17 @@ def getConfigFileName():
 #       cfd = os.path.dirname(os.path.realpath(__file__))
 #       copyFile(cfd + "/index.py", htmlFile)
 
-    checkFile(fileName, "/config.py")
+    checkFile(fileName, "/config.txt")
     checkFile(htmlFile, "/index.html")
-    checkFile(sqmExpCsv, "/sqmexp.py")
+    checkFile(sqmExpCsv, "/sqmexp.csv")
     checkFile(moonFile, "/moon.png")
     checkFile(logoFile, "/logo.png")
     checkFile(compFile, "/compass.png")
+
+    if not os.path.isfile(phaseFile):
+       print("Generating moon phase file...")
+       moon.main()
+       print("moon phase file generated!")
 
     return fileName
 
@@ -81,7 +87,6 @@ def checkFile(destFileName, sourcefilename):
     if not os.path.isfile(destFileName):
        cfd = os.path.dirname(os.path.realpath(__file__))
        copyFile(cfd + sourceFileName, destFileName)
-
 
 
 def copyFile(origin, dest):

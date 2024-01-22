@@ -51,7 +51,7 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     stringa = inte
     drawing.text(pos, stringa, fill=colore, font=font)
 
-    pos=(text_positions[1][0], text_positions[1][1])
+    pos=(text_positions[3][0], text_positions[13[1])
     stringa = "Sunrise " + srise + "\nSunset " + sset
     drawing.text(pos, stringa, fill=colore, font=font)
 
@@ -64,7 +64,7 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     stringa = "Night Start "+ NS +"\nNight End "+ NE + stringa_sqm + str(round(sqm,2))
     drawing.text(pos, stringa, fill=colore, font=font)
 
-    pos=(text_positions[3][0], text_positions[3][1])
+    pos=(text_positions[1][0], text_positions[1][1])
     stringa = "Moonrise " + moon_rise + "\nMoonset " + moon_set + "\n" + str(fract) + "% | " + phase
     drawing.text(pos, stringa, fill=colore, font=font)
 
