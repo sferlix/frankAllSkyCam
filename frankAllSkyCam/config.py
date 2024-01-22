@@ -73,14 +73,14 @@ font_colorB = 255
 top_left_x = 5
 top_left_y = 0
 
- # sunrise / sunset
+ #moon
 top_right_x = 670
 top_right_y = 0
 
  #night and SQM
 bottom_left_x = 5
 bottom_left_y = 535
- #moon
+ #sunrise / sunset
 bottom_right_x = 630
 bottom_right_y =  535
 
@@ -117,6 +117,14 @@ compass_rot_angle = 20
 logo_filename = logo.png
 logo_x_pos = 30
 logo_y_pos = 580
+
+[moon_phase_img]
+# relative path from frankAllSkyCam
+# if file not found, it will be skipped
+# set your coords according to your resolution
+moon_filename = phase.png
+moon_x_pos = 910
+moon_y_pos = 80
 
 [exposure]
 # max night exposure in seconds
