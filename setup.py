@@ -3,15 +3,15 @@ from distutils.core import setup
 setup(
   name = 'frankAllSkyCam',
   packages = ['frankAllSkyCam'],
-  version = '9.3',
+  version = '9.4',
   license='MIT',
   description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',
   author = 'Francesco Sferlazza',
   author_email = 'sferlazza@gmail.com',
   url = 'https://github.com/sferlix/frankAllSkyCam',
-  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/9.3.tar.gz',
+  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/9.4.tar.gz',
   keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],
-  package_data={'': ['moon.png','compass.png','logo.png','index.html', 'sqmexp.txt','config.txt']},
+  package_data={'': ['moon.png','compass.png','logo.png','index.html', 'sqmexp.csv','config.txt']},
   include_package_data=True,
   install_requires=[
           'pytz',
