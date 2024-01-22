@@ -9,8 +9,10 @@ setup(
   author = 'Francesco Sferlazza',
   author_email = 'sferlazza@gmail.com',
   url = 'https://github.com/sferlix/frankAllSkyCam',
-  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/8.7.tar.gz',
+  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/9.0.tar.gz',
   keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],
+  package_data={'': ['moon.png','compass.png','logo.png','index.html', 'sqmexp.txt','config.txt']},
+  include_package_data=True,
   install_requires=[
           'pytz',
           'numpy',
