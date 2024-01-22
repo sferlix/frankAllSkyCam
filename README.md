@@ -21,17 +21,8 @@ details below. Enjoy !
 
 # 1. Pre-requisites
 prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
-The important point is that your OS must have the **libcamera** software (included in the last Raspberry OS).
-The former version (raspistill) is not supported.If you want to check if you have libcamera installed, just type this command:
 
-`libcamera-jpeg -o test.jpg --immediate -n`
-
-you should find test.jpg in your current folder
-
-Supposing you are fine with this pre-requisite, let's start
-
-# 2. Ensure everything is updated:
-
+Ensure everything is updated:
 ```
 sudo apt update
 sudo apt upgrade
@@ -40,9 +31,19 @@ check you have pip installed (should be already in you raspberry):
 
 `sudo apt install python3-pip`
 
-done !
+Install ImageMagick:
 
-**Now you can install frankAllSkyCam**
+`sudo apt-get install libmagickwand-dev`
+
+frankAllSkyCam uses the **libcamera** software (included in the last Raspberry OS). The former version (raspistill) is not supported. If you want to check if you have libcamera installed, just type this command:
+
+`libcamera-jpeg -o test.jpg --immediate -n`
+
+you should see the libcamera operating and, at the end, you should find test.jpg in your current folder.
+
+Supposing you are fine with the pre-requisites, let's start !
+
+# 2. Install frankAllSkyCam
 
 `pip3 install frankAllSkyCam`
 
@@ -60,9 +61,17 @@ The first execution will create some folders:
 and will generate a couple of files:
 
 ```
-/home/pi/frankAllSkyCam/config.txt
+/home/pi/frankAllSkyCam/config.txt   
 /home/pi/frankAllSkyCam/index.html
+/home/pi/frankAllSkyCam/logo.png
+/home/pi/frankAllSkyCam/compass.png
+/home/pi/frankAllSkyCam/moon.png
 ```
+config.txt contains your preferences.
+
+moon.png is used to show the moon-phase as picture on the allsky image.
+
+Of course, you can personalize your logo.png and compass.png
 
 Now you just need to configure your preferences. See below.
 
@@ -114,8 +123,8 @@ If you want a "real" website, please download it from this repository `website` 
 
 ## 2. You will use an external web server.
 
-So you will Upload your AllSkyCam to an external webserver (e.g., via FTP)
-In this case you need to configure your FTP parameters in the config.txt file (see below)
+In this case, you may want to upload your AllSkyCam.jpg to an external webserver (e.g., via FTP)
+To do so, you need to configure your FTP parameters in the config.txt file (see below)
  
 ```
 isFTP=True
