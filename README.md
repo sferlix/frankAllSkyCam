@@ -20,14 +20,14 @@ details below. Enjoy !
 
 
 # 1. Pre-requisites
-prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
+Prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
 
 Ensure everything is updated:
 ```
 sudo apt update
 sudo apt upgrade
 ```
-check you have pip installed (should be already in you raspberry):
+check you have pip installed (should be already in your Raspberry Pi distribution):
 
 `sudo apt install python3-pip`
 
@@ -71,7 +71,7 @@ config.txt contains your preferences.
 
 moon.png is used to show the moon-phase as picture on the allsky image.
 
-Of course, you can personalize your logo.png and compass.png
+logo.png and compass.png are self explicatory and you may sobstitute it with your favourite logo and compass.
 
 Now you just need to configure your preferences. See below.
 
