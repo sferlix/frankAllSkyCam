@@ -174,7 +174,7 @@ def main():
            "compass": [compass_filename != "", compass_filename, compass_x_pos, compass_y_pos, compass_rot_angle],
            "jupiter": [data["Jupiter"], "jupiter.png", jupiter_x_pos, jupiter_y_pos, 0],
            "mars": [data["Mars"], "mars.png", mars_x_pos, mars_y_pos, 0],
-           "saturn": [data["Saturn"], "saturn.png", saturn_x_pos, saturn_y_pos, 0]
+           "saturn": [data["Saturn"], "saturn.png", saturn_x_pos, saturn_y_pos, 0],
            "venus": [data["Venus"], "venus.png", venus_x_pos, venus_y_pos, 0]
        }
 
