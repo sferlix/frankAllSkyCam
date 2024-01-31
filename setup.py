@@ -3,13 +3,13 @@ from distutils.core import setup
 setup(
   name = 'frankAllSkyCam',
   packages = ['frankAllSkyCam'],
-  version = '9.9',
+  version = '10.0',
   license='MIT',
   description = 'AllSkyCamera with Raspberry Pi and Pi HQ Camera ',
   author = 'Francesco Sferlazza',
   author_email = 'sferlazza@gmail.com',
   url = 'https://github.com/sferlix/frankAllSkyCam',
-  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/9.9.tar.gz',
+  download_url = 'https://github.com/sferlix/frankAllSkyCam/archive/refs/tags/10.0.tar.gz',
   keywords = ['AllSkyCamera', 'Astronomy', 'AllSky'],
   package_data={'': ['moon.png','compass.png','logo.png','index.html', 'sqmexp.csv', 'jupiter.png', 'saturn.png', 'mars.png', 'venus.png','config.txt']},
   include_package_data=True,
@@ -18,8 +18,7 @@ setup(
           'numpy',
           'pandas',
           'ephem',
-          'wand',
-          'bisect'
+          'wand'
       ],
   classifiers=[
     'Development Status :: 4 - Beta',
