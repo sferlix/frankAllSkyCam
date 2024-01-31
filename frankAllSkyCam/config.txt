@@ -1,0 +1,186 @@
+########################################
+# frankAllSkyCam
+# configuration file -  config.txt
+#
+# please adjust according to your needs
+# see comments and documentation
+########################################
+
+[system]
+# where will be stored images - relative path to frankAllSkyCam
+otuputFolder= img
+
+# directory where to save logs
+logFolder = log
+
+# local web folder where to save the skycam.jpg
+outputLocalWebFile = /var/www/html/img/skycam.jpg
+
+#how many days you want to keep jpgs
+days_retention = 3
+
+#watchdog will reboot if after x minutes no image has been generated
+rebootAfter = 15
+
+[site]
+# configure your site (lat / long / elevation in meters, pytz timezone)
+latitude = 44.75
+longitude = 9.29
+elevation = 1150
+time_zone = Europe/Rome
+#the following label will be printed on the image
+inte = <your site name here>
+
+[resolution]
+# may use  800 x 600 as you wish
+horiz = 1024
+vert = 768
+picture_rotation = 0
+
+[libcamera]
+# may personalize the libcamara params.
+# please DO NOT set --shutter, --immediate
+# night parameters will be used only when exposure > 0
+additional_night_params = --gain 14 --awbgains 2.7,1.5 --contrast 1.5
+additional_day_params = --metering average
+
+
+[timelapse]
+# if True, timelapse from sunset to sunrise will be generated  Otherwise, not.
+nightTL = True
+
+# if True, 24h timelapse from 9am to 9am next day will be generated. Otherwise, not.
+fullTL = True
+nightOnly = True
+
+# following parameters are used by ffmpeg
+tl_horiz = 1024
+tl_vert = 768
+framerate = 15
+ffmpeg1 = -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p
+# additional ffmpeg parameters may be added by experts!
+ffmpeg2 =
+ffmpeg3 =
+
+[font]
+#when 1024x768 you can increase it
+font_size = 20
+font_colorR = 0
+font_colorG = 255
+font_colorB = 255
+
+[text_coords]
+# coordinates of the text to be added on the allskycam image
+  #date,time
+top_left_x = 20
+top_left_y = 0
+
+ # sunrise / sunset
+top_right_x = 820
+top_right_y = 0
+
+ #night and SQM
+bottom_left_x = 20
+bottom_left_y = 695
+
+ #moon
+bottom_right_x = 825 
+bottom_right_y = 695
+
+  #top, center (your name, see the [site] section above)
+top_center_x = 450
+top_center_y = 0
+
+
+[extra_text]
+# et_use = y if you want to add some extra text
+et_use= y
+# absolute path to your txt file
+et_data_file = /home/pi/frankAllSkyCam/extra_data.txt
+et_font_size = 20
+et_font_colorR = 0
+et_font_colorG = 255
+et_font_colorB = 255
+et_x_pos = 20
+et_y_pos = 50
+
+[compass]
+# relative path from frankAllSkyCam/png
+# if file not found, it will be skipped
+# set your coords according to your resolution
+compass_filename = compass.png
+compass_x_pos = 900
+compass_y_pos = 580
+compass_rot_angle = 0
+
+[logo]
+# relative path from frankAllSkyCam/png
+# if file not found, it will be skipped
+# set your coords according to your resolution
+logo_filename = logo.png
+logo_x_pos = 30
+logo_y_pos = 580
+
+[moon_phase_img]
+# relative path from frankAllSkyCam/png
+# if file not found, it will be skipped
+# set your coords according to your resolution
+moon_filename = phase.png
+moon_x_pos = 910
+moon_y_pos = 110
+
+[planets]
+# relative path from frankAllSkyCam/png
+# if file not found, it will be skipped
+# set your coords according to your resolution
+jupiter_x_pos = 25
+jupiter_y_pos = 310
+mars_x_pos = 25
+mars_y_pos = 350
+saturn_x_pos = 25
+saturn_y_pos = 390
+venus_x_pos = 25
+venus_y_pos = 450
+
+[exposure]
+# max night exposure in seconds
+#  for urban sky, suggested value is 4
+#  for dark sky, suggested value is 55-60 (I found 55 secs ok for sqm 21,3).
+#  this value only limits the max exposure. The calculated or real SQM will drive exposure
+esp_secs =60
+
+[ftp]
+# if True, allSkyCam image, timelapse and startrails
+#will be uploaded on your FTP Server
+isFTP=False
+
+# ftp parameters, to upload the allSkyCam image to your FTP server
+FTP_server = your_site.com
+FTP_login = your_username
+FTP_pass = your_password
+FTP_uploadFolder =/public_html
+
+# uploaded file name (e.g.,allskycam.jpg). no need to add the jpg extention
+FTP_filenameAllSkyImgJPG = /img/allskycam
+
+# allskycam_night.mp4 will be generated if nightTL = True
+# allskycam_24h.mp4 will be generated if fullTL = True
+FTP_fileNameTimelapseMP4 = /video/frankAllSkycam
+
+# starTrail.jpg will be generated
+FTP_fileNameStarTrailJPG = /startrail/startrail.jpg
+
+[sqm]
+# info about your SQM-LE reader (if you have not it, just let use_sqm_le = n)
+# directory where to save sqm info
+sqmFolder = sqm
+# would you use the SQM-LE ? y/n
+use_sqm_le = n
+# would you log your SQM ? y/n
+sqmLog = n
+# keep sqmDebug = n
+sqmDebug = n
+# in case you have SQM-LE, put your IP/port
+ip_address = 192.168.2.59
+port = 10001
+
