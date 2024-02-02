@@ -56,22 +56,18 @@ The first execution will create some folders:
 /home/pi/frankAllSkyCam/img
 /home/pi/frankAllSkyCam/log
 /home/pi/frankAllSkyCam/sqm
+/home/pi/frankAllSkyCam/png
 ```
 
-and will generate a couple of files:
+and will generate some files:
 
 ```
 /home/pi/frankAllSkyCam/config.txt   
 /home/pi/frankAllSkyCam/index.html
-/home/pi/frankAllSkyCam/logo.png
-/home/pi/frankAllSkyCam/compass.png
-/home/pi/frankAllSkyCam/moon.png
 ```
 config.txt contains your preferences.
 
-moon.png is used to show the moon-phase as picture on the allsky image.
-
-logo.png and compass.png are self explicatory and you may sobstitute it with your favourite logo and compass.
+The png folder will contain some image files that you may personalize (e.g., logo and compass), together with other png files such as moon and planets.
 
 Now you just need to configure your preferences. See below.
 
@@ -119,7 +115,7 @@ Just move the index.html file into your local web server:
 ```
 sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
 ```
-If you want a "real" website, please download it from this repository `website` folder. It's just html + Javascript. No php needed.
+If you want a "real" website, please download it from this repository, `website` folder. It's just html + Javascript. No php needed.
 
 ## 2. You will use an external web server.
 
@@ -140,17 +136,18 @@ FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
 According to the above configuration, the allskycam, startrail images and timelapses videos will be uploaded on a remote website, via FTP.
 Of course, if you do not want to use a remote FTP just set `isFTP=False`
 
-An additional parameter will enable / disable the generation of the timelapse:
+An additional parameter will enable / disable the generation of the timelapses:
 
 ```
 nightTL = True
 fullTL = True
 ```
 
-allskycam_night.mp4 will be generated if `nightTL = True`
-allskycam_24h.mp4 will be generated if `fullTL = True`
+allskycam_night.mp4 will only show the night timelapse, from sunset to suntise and will be generated if `nightTL = True`
 
-There are many other options. The config.txt file is self-explanatory and you can customize many things, including logo, compass, extra-data you may want to print on your AllSkyCam image
+allskycam_24h.mp4 will be showing th 24h and will be generated if `fullTL = True`
+
+There are some other options. The config.txt file is self-explanatory and you can customize many things, including logo, compass, extra-data you may want to print on your AllSkyCam image (eg info coming from your sensors, your meteo station if any).
   
 
  # 3. Test to check if it works:
@@ -180,7 +177,7 @@ it will install all the jobs !
   
 ## For expert users 
   
-You may want to customize your exposure time, depending on SQM values.
+This software calculates the exposure time thanks to a machine learning algorithm I have trained to derive the SQM. Even it is not needed at all, You may want to customize your exposure time, depending on SQM values.
 Pairs "(SQM value, exposure in secs)" are stored in this file:
    
  ` /home/pi/frankAllSkyCam/sqmexp.csv`
@@ -189,6 +186,8 @@ Pairs "(SQM value, exposure in secs)" are stored in this file:
 
 So, if you wish to adjust it, you just need to change the exposure for every given SQM value. If you wish, you can also add more pairs (sqm values, secs).
  The software would predict the exposure duration by interpolating among existing values (polynomial regression grade=3).
- You may want calibrate your exposures and combine it with your desired --gain and --awbgains options (in config.txt)  
+ 
+ You may want customize your libcamera settings, according to your camera and preferences. For example, you can change your --gain and --awbgains options (in config.txt) and add additional libcamera options.
+ 
  In any case, the max exposure value will not exceed the esp_secs parameter in config.txt
   
