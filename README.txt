@@ -38,6 +38,11 @@ d) the allSkyCam software
 
 pip3 install frankAllSkyCam
 
+please, note that if you're running Bookworm, you may get an error message stating that you need a dedicated environment. if this is the case, then run this command:
+
+pip3 install frankAllSkyCam --break-system-packages
+
+
 after the installation, go to the AllSkyCam directory:
 
 cd /home/pi/frankAllSkyCam
