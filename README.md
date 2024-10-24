@@ -5,6 +5,10 @@ Here is what you need to install, *after ensuring to satisfy requirements* (see 
 # `pip3 install frankAllSkyCam`
 
 
+if it doesn't work (e.g., you are on the latest version of the Pi OS) try this:
+
+# pip3 install frankAllSkyCam --break-system-packages
+
 installation is done, but you still need to configure some parameters, according to your preferences.
 To do so, launch the program:
 
