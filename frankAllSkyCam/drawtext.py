@@ -23,7 +23,9 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     esposiz   = s["exposure"]
     sqm       = s["sqm"]
     newMoon   = s["newMoon"]
-   
+    stars     = s["stars"]
+    clouds    = s["clouds"]
+
     photo = Image.open(nomefile)
     if rotation!=0:
        new_photo=photo.rotate(rotation)
@@ -61,7 +63,9 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     stringa_sqm =""
     if sqm > 0:
        if sqm_le == 'n': stringa_sqm ="c"
-       stringa_sqm += "SQM: " + str(round(sqm,2))
+       stringa_sqm += "SQM: " + str(round(sqm,2)) 
+       if stars > 0:
+          stringa_sqm += "  Stars: " + str(stars) + " Clouds:" + str(clouds)+"%" 
 
     stringa = stringa_sqm + "\nNight: "+ NS +" \u2192 "+ NE
     drawing.text(pos, stringa, fill=colore, font=font)

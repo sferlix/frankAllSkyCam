@@ -11,7 +11,7 @@ import time
 from pytz import timezone
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, starscalc
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -108,6 +108,8 @@ def main():
     data["sqm"] = sqm
     data["exposure"] = exposure
     data["inte"] = inte
+    data["stars"] = 0
+    data["clouds"] = 0
 
     calculateEphem.printData(data)
     #max exposure (esp_secs from config.txt) wins over the calculated exposure
@@ -148,6 +150,11 @@ def main():
           extra_text = [extra_string, et_font_size, et_font_color, et_x_pos, et_y_pos]
 
        # print data dictionary on the allsky image
+       if exposure >0:
+          # calculate stars and clouds
+          data["stars"], data["clouds"] = analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30)
+   
+
        drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)
 
        '''
