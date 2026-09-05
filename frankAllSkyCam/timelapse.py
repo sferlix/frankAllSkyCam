@@ -28,6 +28,10 @@ tl_vert = str(config['timelapse']['tl_vert'])
 framerate = str(config['timelapse']['framerate'])
 nightTL = str(config['timelapse']['nightTL'])=='True'
 fullTL = str(config['timelapse']['fullTL'])=='True'
+# optional - fallback() keeps this working on existing config.txt files that
+# predate this feature (no re-seeding)
+smoothMotion = config.getboolean('timelapse', 'smoothMotion', fallback=True)
+deflicker = config.getboolean('timelapse', 'deflicker', fallback=True)
 ffmpeg1 = str(config['timelapse']['ffmpeg1'])
 ffmpeg2 = str(config['timelapse']['ffmpeg2'])
 ffmpeg3 = str(config['timelapse']['ffmpeg3'])
@@ -42,21 +46,36 @@ FTP_fileNameTimelapse = str(config['ftp']['FTP_fileNameTimelapseMP4'])
 tz = timezone(time_zone)
 x = datetime.datetime.now(tz)
 
+def buildVideoFilter():
+    # scale uses lanczos rather than ffmpeg's default bilinear - it preserves
+    # small point sources (stars) better under resize. smoothMotion uses a
+    # plain tblend average (no framestep - keeps frame count/duration
+    # unchanged) rather than motion-compensated interpolation (minterpolate):
+    # true motion estimation is too slow for a Pi over hundreds of frames and
+    # tends to ghost/warp on noisy, low-contrast starfields anyway.
+    filters = ["scale=" + str(tl_horiz) + ":" + str(tl_vert) + ":flags=lanczos"]
+    if smoothMotion:
+       filters.append("tblend=average")
+    if deflicker:
+       filters.append("deflicker=mode=am:size=5")
+    return ",".join(filters)
+
+
 def launchFFmpeg(inputFile, outputFile):
 
     myOutput = outputFile
-
-#' -vf "tblend=average,framestep=2,tblend=average,framestep=2,tblend=average,framestep=2,tblend=average,framestep=2,setpts=0.25*PTS" '
-#" -filter:v minterpolate"
-#" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p "
 
     comando = "ffmpeg -framerate "
     comando += framerate
     comando += ' -pattern_type glob -i "'
     comando += inputFile + ".jpg"
-    comando += '" -y -s:v '
-    comando += str(tl_horiz) +"x" + str(tl_vert)
+    comando += '" -y -vf "'
+    comando += buildVideoFilter()
+    comando += '"'
     comando += " " + ffmpeg1
+    # NOTE: ffmpeg2/ffmpeg3 are appended as-is (expert use) - if they also
+    # set -vf/-filter:v, ffmpeg will error out on the duplicate flag; disable
+    # smoothMotion/deflicker in config.txt first if you need full control here
     comando += " " + ffmpeg2
     comando += " " + ffmpeg3
 

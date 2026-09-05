@@ -150,6 +150,15 @@ nightTL = True   # allskycam_night.mp4, sunset to sunrise
 fullTL = True    # allskycam_24h.mp4, full day
 ```
 
+By default the video is smoothed on generation, since captures 1-2 minutes apart otherwise make stars visibly "jump" frame to frame rather than glide:
+
+```ini
+smoothMotion = True   # tblend frame-blend for smoother apparent star motion
+deflicker = True      # smooths frame-to-frame exposure/brightness variation
+```
+
+Both are cheap (no motion estimation, unlike ffmpeg's `minterpolate`, which is too slow on a Pi over hundreds of frames and prone to ghosting on noisy starfields) and safe to leave on. `config.txt`'s `ffmpeg2`/`ffmpeg3` remain a free-form expert escape hatch for extra encoder flags, but the software already applies its own `-vf` for scaling plus these two filters - if you add your own `-vf`/`-filter:v` there, set `smoothMotion`/`deflicker` to `False` first, since ffmpeg errors out on a duplicate `-vf` flag rather than merging them.
+
 `config.txt` is fully commented - text position, font/color, logo/compass/planet icon placement, and max night exposure (`esp_secs`) are all in there and safe to tweak.
 
 ## 4. Test it

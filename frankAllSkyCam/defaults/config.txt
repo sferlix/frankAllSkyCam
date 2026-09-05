@@ -62,8 +62,21 @@ nightOnly = True
 tl_horiz = 1024
 tl_vert = 768
 framerate = 15
+
+# smooths the frame-to-frame star "jump" from the 1-2 minute capture gap via
+# a cheap tblend frame-blend (no motion estimation - safe and fast on a Pi,
+# unlike ffmpeg's minterpolate which is not).
+smoothMotion = True
+# smooths frame-to-frame brightness flicker (exposure varies slightly shot to
+# shot, especially with exposure_mode = auto_exposure above).
+deflicker = True
+
 ffmpeg1 = -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p
 # additional ffmpeg parameters may be added by experts!
+# NOTE: the software already applies its own -vf (scale + smoothMotion +
+# deflicker above). ffmpeg errors out if -vf/-filter:v is given twice, so if
+# you add your own -vf/-filter:v here, first set smoothMotion and deflicker
+# to False and fold scale/tblend/deflicker into your own filter string.
 ffmpeg2 =
 ffmpeg3 =
 
