@@ -45,10 +45,6 @@ x = datetime.datetime.now(tz)
 def launchFFmpeg(inputFile, outputFile):
 
     myOutput = outputFile
-    if outputFile[-7:]=="24h.mp4":
-       extension="*.jpg"
-    else:
-       extension="*TL.jpg"
 
 #' -vf "tblend=average,framestep=2,tblend=average,framestep=2,tblend=average,framestep=2,tblend=average,framestep=2,setpts=0.25*PTS" '
 #" -filter:v minterpolate"
@@ -101,7 +97,9 @@ def generateTimeLapse(tl_type):
    tl_extension = str(tl_output[2])
 
    nomeFile = tl_folder + "/" + tl_filename
-   inputFile = tl_folder + '/*' + tl_type
+   # anchored to the "skycam_" capture prefix so startrail_*.jpg (and any
+   # other non-capture file dropped in the same day folder) is never globbed in
+   inputFile = tl_folder + '/skycam_*' + tl_type
 
    outputFile = launchFFmpeg(inputFile, nomeFile)
    print(outputFile)

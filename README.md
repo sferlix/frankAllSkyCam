@@ -1,197 +1,209 @@
-# frankAllSkyCam - AllSkyCam software 
+# frankAllSkyCam
 
-Here is what you need to install, *after ensuring to satisfy requirements* (see below):
+Open-source AllSky camera software for a **Raspberry Pi + Pi HQ Camera** (or compatible libcamera sensor) with a fisheye lens. Point it at the sky, run it on a cron schedule, and it takes care of the rest:
 
-# `pip3 install frankAllSkyCam`
+- Captures a full-sky JPEG every minute or so, with exposure automatically driven by measured or estimated sky brightness (SQM), day or night.
+- Watermarks each image with date/time, sun and moon rise/set times, moon phase, visible-planet icons, your own logo/compass, and any extra sensor data you want to show (weather station, temperature, humidity, ...).
+- Estimates **cloud cover** and **star count** directly from the image, using different, purpose-built detection for daytime (blue-sky-vs-cloud color analysis) and nighttime (adaptive point-source detection that accounts for the Moon, trees/obstructions, and partial cloud).
+- Builds nightly **timelapses** (night-only and/or full 24h) and a **startrail** image, and can upload everything to your own website via FTP.
+- Optionally drives a **dew heater** (via a network relay or a GPIO-controlled one) based on the gap between internal temperature and dew point, to keep the lens clear.
+- A watchdog reboots the Pi automatically if captures ever stall.
 
+Everything runs unattended via cron, installed with a single command.
 
-if it doesn't work (e.g., you are on the latest version of the Pi OS) try this:
+## Quick install
 
-# pip3 install frankAllSkyCam --break-system-packages
+```
+pip3 install frankAllSkyCam
+```
 
-installation is done, but you still need to configure some parameters, according to your preferences.
-To do so, launch the program:
+On newer Raspberry Pi OS (Bookworm and later), `pip` may refuse a system-wide install; if so, use:
 
-`python3 -m frankAllSkyCam`
+```
+pip3 install frankAllSkyCam --break-system-packages
+```
 
-It will create some folders and the config.txt file. Now, you can start the configuration.
-Edit the single config.txt like this:
+Then run it once to generate your config:
 
-`nano /home/pi/frankAllSkyCam/config.txt`
+```
+python3 -m frankAllSkyCam
+```
 
-details below. Enjoy !
+This creates `~/frankAllSkyCam/` with a `config.txt` you'll want to edit before going further - see the full walkthrough below.
 
+---
 
+## 1. Prerequisites
 
-# 1. Pre-requisites
-Prepare a clean SD card with the last version of raspbian. Lite version, without desktop is fine. 
+Start from a clean, up-to-date Raspberry Pi OS (Lite is fine, no desktop needed):
 
-Ensure everything is updated:
 ```
 sudo apt update
 sudo apt upgrade
 ```
-check you have pip installed (should be already in your Raspberry Pi distribution):
 
-`sudo apt install python3-pip`
-
-Install ImageMagick:
-
-`sudo apt-get install libmagickwand-dev`
-
-frankAllSkyCam uses the **libcamera** software (included in the last Raspberry OS). The former version (raspistill) is not supported. If you want to check if you have libcamera installed, just type this command:
-
-`libcamera-jpeg -o test.jpg --immediate -n`
-
-you should see the libcamera operating and, at the end, you should find test.jpg in your current folder.
-
-Supposing you are fine with the pre-requisites, let's start !
-
-# 2. Install frankAllSkyCam
-
-`pip3 install frankAllSkyCam`
-
-Now you have need to launch program, so that installation will be complete.
-
-The first execution will create some folders:
+Make sure `pip` is available:
 
 ```
-/home/pi/frankAllSkyCam
-/home/pi/frankAllSkyCam/img
-/home/pi/frankAllSkyCam/log
-/home/pi/frankAllSkyCam/sqm
-/home/pi/frankAllSkyCam/png
+sudo apt install python3-pip
 ```
 
-and will generate some files:
+Install ImageMagick's development headers (needed to render the moon-phase image):
 
 ```
-/home/pi/frankAllSkyCam/config.txt   
-/home/pi/frankAllSkyCam/index.html
+sudo apt install libmagickwand-dev
 ```
-config.txt contains your preferences.
 
-The png folder will contain some image files that you may personalize (e.g., logo and compass), together with other png files such as moon and planets.
-
-Now you just need to configure your preferences. See below.
-
-# 2. Configure your system
-To configure your system, edit the single config.txt file:
-
-`/home/pi/frankAllSkyCam/config.txt`
-
-To edit the config.txt, you could use the nano editor:
-
-`nano config.txt`
-
-I would suggest to configure at least the following parameters:
+frankAllSkyCam uses **libcamera** (bundled with current Raspberry Pi OS). The older `raspistill` is not supported. Check libcamera works before going further:
 
 ```
-inte = <name of your AllSkyCam that will be printed on top-center of the allSky images>
-latitude = 44.73
-longitude = 9.31
+libcamera-jpeg -o test.jpg --immediate -n
+```
+
+You should see it capture and leave a `test.jpg` in the current folder.
+
+## 2. Install frankAllSkyCam
+
+```
+pip3 install frankAllSkyCam
+```
+
+Then launch it once, so it can bootstrap your configuration:
+
+```
+python3 -m frankAllSkyCam
+```
+
+The first run creates:
+
+```
+~/frankAllSkyCam/
+~/frankAllSkyCam/img/       (captured images, organized by day)
+~/frankAllSkyCam/log/       (logs from every scheduled job)
+~/frankAllSkyCam/sqm/       (SQM readings, if enabled)
+~/frankAllSkyCam/png/       (logo, compass, moon/planet icons - customize freely)
+~/frankAllSkyCam/tools/     (optional extras - see "Extra sensors" below)
+~/frankAllSkyCam/config.txt
+~/frankAllSkyCam/index.html
+```
+
+Any of these files can be freely edited - they live outside the installed package, so a future `pip install --upgrade frankAllSkyCam` will never overwrite your customizations. `png/` in particular is where you'd drop your own logo or compass image, matching the filenames already configured in `config.txt`.
+
+## 3. Configure your system
+
+Edit `~/frankAllSkyCam/config.txt` (e.g. `nano ~/frankAllSkyCam/config.txt`). At minimum, set:
+
+```ini
+[site]
+inte = <name printed on top-center of the image>
+latitude = 44.75
+longitude = 9.29
+elevation = 1150
 time_zone = Europe/Rome
 ```
-in case you own the SQM-LE, ensure use_sqm =y and put the IP address and port of the SQM-LE:
 
-```
-use_sqm = y 
+If you own a **SQM-LE** sky-quality meter, point to it under `[sqm]` (otherwise leave `use_sqm_le = n` and the software estimates SQM from the image itself):
+
+```ini
+[sqm]
+use_sqm_le = n
 ip_address = <ip_address_of_the_SQM_LE>
 port = 10001
-write_log = n
+sqmLog = n
 ```
 
-It's time to decide if your Raspberry Pi will work also as a web server.
+### Hosting the image
 
-## 1. Use your Raspberry as a web server
-Then, you need to have Apache (or other web server) installed. To do so, type this command:
-
-`sudo apt install apache2 -y`
-
-create the images folder in your web server. Example:
+**Option A - the Pi serves it locally**, via Apache:
 
 ```
-sudo mkdir /var/www/html/img
-```
-After the installation, you will find a very basic `index.html` page to show just the allSky image. 
-Just move the index.html file into your local web server:
-
-```
-sudo mv /home/pi/frankAllSkyCam/index.html /var/www/html/
-```
-If you want a "real" website, please download it from this repository, `website` folder. It's just html + Javascript. No php needed.
-
-## 2. You will use an external web server.
-
-In this case, you may want to upload your AllSkyCam.jpg to an external webserver (e.g., via FTP)
-To do so, you need to configure your FTP parameters in the config.txt file (see below)
- 
-```
-isFTP=True
-FTP_server = <your_ftpserver.com>
-FTP_login = your_user
-FTP_pass = your_password 
-FTP_uploadFolder =your_upload_dir
-FTP_filenameAllSkyImgJPG = allskycam
-FTP_fileNameStarTrailJPG = /startrails/starTrail.jpg
-FTP_fileNameTimelapseMP4 = /videos/frankAllSkycam
+sudo apt install apache2 -y
+sudo mkdir -p /var/www/html/img
+sudo mv ~/frankAllSkyCam/index.html /var/www/html/
 ```
 
-According to the above configuration, the allskycam, startrail images and timelapses videos will be uploaded on a remote website, via FTP.
-Of course, if you do not want to use a remote FTP just set `isFTP=False`
+For a full gallery-style site (timelapses, startrails, sky map) rather than just the bare image, grab the `website/` folder from this repository - plain HTML + JS, no PHP required.
 
-An additional parameter will enable / disable the generation of the timelapses:
+**Option B - upload to an external website via FTP.** Configure `[ftp]` in `config.txt`:
+
+```ini
+[ftp]
+isFTP = True
+FTP_server = your_ftpserver.com
+FTP_login = your_username
+FTP_pass = your_password
+FTP_uploadFolder = /your_folder/
+FTP_filenameAllSkyImgJPG = /img/allskycam
+FTP_fileNameTimelapseMP4 = /video/frankAllSkycam
+FTP_fileNameStarTrailJPG = /startrail/startrail.jpg
+```
+
+Leave `isFTP = False` if you don't want any remote upload.
+
+### Timelapses
+
+```ini
+[timelapse]
+nightTL = True   # allskycam_night.mp4, sunset to sunrise
+fullTL = True    # allskycam_24h.mp4, full day
+```
+
+`config.txt` is fully commented - text position, font/color, logo/compass/planet icon placement, and max night exposure (`esp_secs`) are all in there and safe to tweak.
+
+## 4. Test it
 
 ```
-nightTL = True
-fullTL = True
+python3 -m frankAllSkyCam
 ```
 
-allskycam_night.mp4 will only show the night timelapse, from sunset to suntise and will be generated if `nightTL = True`
+If it worked, you'll find the generated JPEG:
 
-allskycam_24h.mp4 will be showing th 24h and will be generated if `fullTL = True`
+1. In a browser, at `http://<your_raspberry_IP>` (if you set up Apache)
+2. At `~/frankAllSkyCam/img/<YYYYMMDD>/<file>.jpg`
+3. On your remote FTP host, if configured
 
-There are some other options. The config.txt file is self-explanatory and you can customize many things, including logo, compass, extra-data you may want to print on your AllSkyCam image (eg info coming from your sensors, your meteo station if any).
-  
+## 5. Automate it
 
- # 3. Test to check if it works:
+```
+python3 -m frankAllSkyCam.crontab
+```
 
-from command line, just type:
+This installs every scheduled job for you: captures (every 1-2 min, day/night-aware interval), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
 
-`python3 -m frankAllSkyCam`
+Every job's output now goes to its own log file under `~/frankAllSkyCam/log/`, so if anything misbehaves, that's the first place to check.
 
-if it works, you should find the generated JPGs:
+### Enjoy it!
 
-1. via browser, test http://<your_raspberry_IP>
-2. /home/pi/frankAllSkyCam/img/<img_folder_with_date>/<jpg files>
-3. on your remote FTP, in case you have configured it
- 
-  
-# 4. Last step. 
-  
-If everything works, just make everything automatic. 
-Type this command:
+---
 
-`python3 -m frankAllSkyCam.crontab`
-  
-it will install all the jobs ! 
+## Extra sensors, weather stations, and the dew heater
 
-### Enjoy it !
- 
-  
-## For expert users 
-  
-This software calculates the exposure time thanks to a machine learning algorithm I have trained to derive the SQM. Even it is not needed at all, You may want to customize your exposure time, depending on SQM values.
-Pairs "(SQM value, exposure in secs)" are stored in this file:
-   
- ` /home/pi/frankAllSkyCam/sqmexp.csv`
-  
-  (e.g., nano   /home/pi/frankAllSkyCam/sqmexp.csv)
+`~/frankAllSkyCam/tools/` holds small, independent scripts meant for **you to edit** - they live outside the installed package specifically so a `pip install --upgrade` never touches your customizations.
 
-So, if you wish to adjust it, you just need to change the exposure for every given SQM value. If you wish, you can also add more pairs (sqm values, secs).
- The software would predict the exposure duration by interpolating among existing values (polynomial regression grade=3).
- 
- You may want customize your libcamera settings, according to your camera and preferences. For example, you can change your --gain and --awbgains options (in config.txt) and add additional libcamera options.
- 
- In any case, the max exposure value will not exceed the esp_secs parameter in config.txt
-  
+- **`generateExtraData.py`** collects data from your own devices (a weather station, a Shelly smart plug, an I2C temperature/humidity sensor, ...) and writes a single text string that gets watermarked onto the image (enable it via `et_use = y` under `[extra_text]` in `config.txt`). Several ready-made helper functions are included (Ecowitt/WS90-style JSON stations, a Davis Vantage Pro2 plaintext feed, Shelly devices) - uncomment and configure the ones you have in `getData()`.
+- **`generateExtraData.conf`**, sitting next to it, holds your device URLs/IPs and credentials - kept separate from the main `config.txt` on purpose, so this file can be handed to (or edited by) someone who only needs to touch sensor settings.
+- The same file can also **switch a dew heater on/off**, based on `(internal temperature - dew point)`, reusing whatever sensor readings you already fetch for the watermark text (no extra network calls). It supports either a network relay (e.g. a Shelly) or a relay wired directly to a Raspberry Pi GPIO pin - see the `[dew_heater]` section in `generateExtraData.conf`.
+
+Both are wired into the crontab automatically by `python3 -m frankAllSkyCam.crontab`.
+
+## For expert users
+
+Exposure duration is predicted from SQM via a small polynomial model, trained from real-world `(SQM, exposure seconds)` pairs stored in:
+
+```
+~/frankAllSkyCam/sqmexp.csv
+```
+
+Add or adjust pairs to retune the curve for your own site/camera/gain settings - the software interpolates (degree-3 polynomial regression) between the values you provide. The `esp_secs` parameter in `config.txt` always caps the maximum exposure regardless of what the model predicts.
+
+You can also fully customize the `libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, contrast, anything `libcamera-still` accepts (just don't set `--shutter` or `--immediate` there, those are managed for you).
+
+## Requirements
+
+Installed automatically via pip: `pytz`, `numpy`, `ephem`, `Wand`, `opencv-python-headless`, `Pillow`, `requests`. Python 3.9+.
+
+If you use the optional sensor examples in `tools/generateExtraData.py` that read Raspberry Pi hardware directly (CPU temperature, an I2C sensor, GPIO-driven relays), they rely on `gpiozero`, `smbus`/`smbus2`, and `RPi.GPIO` - all pre-installed on Raspberry Pi OS, no extra steps needed.
+
+## License
+
+GPLv3 - see [LICENSE](LICENSE).

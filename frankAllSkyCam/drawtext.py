@@ -26,11 +26,18 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     stars     = s["stars"]
     clouds    = s["clouds"]
 
+
+    print("start writing on jpeg: " + nomefile)
+    et_stringa = extra_text[0]
+    if esposiz > 0:
+       et_stringa = et_stringa + "\n\nStars: " + str(stars) + "\nClouds: " + str(round(clouds)) + "%"
+    else:
+       et_stringa = et_stringa + "\n\nClouds: " + str(round(clouds)) + "%"
+
+
     photo = Image.open(nomefile)
     if rotation!=0:
-       new_photo=photo.rotate(rotation)
-       new_photo.save(nomefile)
-       photo = Image.open(nomefile)
+       photo = photo.rotate(rotation)
 
     drawing = ImageDraw.Draw(photo)
     font = ImageFont.truetype("DejaVuSerif.ttf", font_size)
@@ -64,8 +71,6 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     if sqm > 0:
        if sqm_le == 'n': stringa_sqm ="c"
        stringa_sqm += "SQM: " + str(round(sqm,2)) 
-       if stars > 0:
-          stringa_sqm += "  Stars: " + str(stars) + " Clouds:" + str(clouds)+"%" 
 
     stringa = stringa_sqm + "\nNight: "+ NS +" \u2192 "+ NE
     drawing.text(pos, stringa, fill=colore, font=font)
@@ -77,8 +82,6 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
     if len(extra_text) > 1:
 
        et_pos=(extra_text[3],extra_text[4])
-       et_stringa = extra_text[0]
-
        et_colore =(extra_text[2][0],extra_text[2][1],extra_text[2][2])
 
        if sqm>18:
@@ -87,9 +90,6 @@ def printWatermark(s, nomefile, font_size, fc, sqm_le, rotation, text_positions,
        et_font = ImageFont.truetype("DejaVuSerif.ttf", extra_text[1])
        drawing.text(et_pos, et_stringa, fill=et_colore, font=et_font)
 
-
-
-    photo.save(nomefile)
-    return
+    return photo
 
 

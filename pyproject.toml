@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frankAllSkyCam"
+version = "12"
+description = "AllSky camera software for Raspberry Pi + Pi HQ Camera: automated capture, watermarking, timelapses, startrails, and day/night cloud & star detection."
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Francesco Sferlazza", email = "sferlazza@gmail.com" }]
+keywords = ["AllSkyCamera", "Astronomy", "AllSky", "Raspberry Pi", "libcamera"]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    "pytz",
+    "numpy",
+    "ephem",
+    "Wand",
+    "opencv-python-headless",
+    "Pillow",
+    "requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/sferlix/frankAllSkyCam"
+Repository = "https://github.com/sferlix/frankAllSkyCam"
+Issues = "https://github.com/sferlix/frankAllSkyCam/issues"
+
+[tool.setuptools]
+packages = ["frankAllSkyCam"]
+
+[tool.setuptools.package-data]
+frankAllSkyCam = [
+    "config.txt",
+    "index.html",
+    "sqmexp.csv",
+    "png/*.png",
+    "tools/*.py",
+    "tools/*.conf",
+    "log/*.txt",
+    "img/*.txt",
+    "sqm/*.txt",
+]

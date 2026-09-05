@@ -8,14 +8,17 @@
 
 '''
 
-from gpiozero import CPUTemperature
 import os
 
 def getData(fileName):
     # use this method to configure your strings to be printed on the picture
     myString = getDataFromTxtFile(fileName)
 
-    #uncomment the following line if you wish to add Pi CPU Temp:
+    #if you wish to add Pi CPU Temp, uncomment the import and getCPUTemp()
+    #call below (kept out by default: extra_data.txt already includes CPU
+    #temp from the external sensor script, and gpiozero adds GPIO backend
+    #init overhead to every capture when unused)
+    #from gpiozero import CPUTemperature
     #myString += getCPUTemp()
 
     print(myString)
@@ -23,6 +26,7 @@ def getData(fileName):
 
 
 def getCPUTemp():
+    from gpiozero import CPUTemperature
     cpu = CPUTemperature()
     return "CPU: " + str(int(cpu.temperature)) + "°C\n"
 
@@ -33,7 +37,6 @@ def getDataFromTxtFile(fileName):
        if os.path.isfile(fileName):
           with open(fileName, encoding='utf8') as f:
                myString = f.read()
-               f.close()
 
     return myString
 

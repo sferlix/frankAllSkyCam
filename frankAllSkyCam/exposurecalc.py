@@ -5,7 +5,7 @@
 '''
 
 import numpy
-import pandas
+import csv
 import sys
 import os
 
@@ -23,23 +23,31 @@ def main(argv):
 
 def getExposure(sq):
 
-   csvfile = os.path.expanduser("~") + "/frankAllSkyCam/sqmexp.csv"
-   df0 = pandas.read_csv(csvfile)
-
    if sq < 9:
       # no need to change the exposure.
       return 0
-   elif sq >= 9 and sq <= 17:
+
+   csvfile = os.path.expanduser("~") + "/frankAllSkyCam/sqmexp.csv"
+   sqmVals = []
+   expVals = []
+   with open(csvfile, newline='') as f:
+      reader = csv.DictReader(f)
+      for row in reader:
+         sqmVals.append(float(row['sqm']))
+         expVals.append(float(row['secs']))
+
+   sqmVals = numpy.array(sqmVals)
+   expVals = numpy.array(expVals)
+
+   if sq >= 9 and sq <= 17:
       # build polynomial model 1, for SQM < 17
-      df0 = df0[df0.sqm < 17.0]
+      mask = sqmVals < 17.0
    else:
       # build polynomial model 2, for SQM > 17
-      df0 = df0[df0.sqm >= 17.0]
+      mask = sqmVals >= 17.0
 
-   EXP = df0['secs']
-   SQM = df0['sqm']
-   myExp = EXP.values
-   mySqm = SQM.values
+   mySqm = sqmVals[mask]
+   myExp = expVals[mask]
 
    polyGrade = 3
    myModel= numpy.poly1d(numpy.polyfit(mySqm, myExp, polyGrade ))

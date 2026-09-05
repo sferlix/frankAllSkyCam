@@ -1,4 +1,4 @@
 # __init__.py
 
 # Version of the frankAllSkyCam
-__version__ = "11"
+__version__ = "12"

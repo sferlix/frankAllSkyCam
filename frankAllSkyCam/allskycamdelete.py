@@ -5,6 +5,7 @@
 
 import datetime
 import os
+import shutil
 from pytz import timezone
 from configparser import ConfigParser
 from frankAllSkyCam import fileManager
@@ -23,12 +24,21 @@ days_retention = int(config['system']['days_retention'])
 
 def main():
     tz = timezone(time_zone)
-    x = datetime.datetime.now(tz)
-    z=datetime.datetime.now(tz)
-    outputDir = outputFolder + "/" + (z+datetime.timedelta(days=-days_retention)).strftime("%Y%m%d")
-    comando ="rm " + outputDir +"/*.*;rmdir " + outputDir
-    print(comando)
-    os.system(comando)
+    z = datetime.datetime.now(tz)
+    cutoff = (z+datetime.timedelta(days=-days_retention)).strftime("%Y%m%d")
+
+    if not os.path.isdir(outputFolder):
+       return
+
+    for name in os.listdir(outputFolder):
+        full = os.path.join(outputFolder, name)
+        if not os.path.isdir(full):
+           continue
+        if not (len(name) == 8 and name.isdigit()):
+           continue
+        if name < cutoff:
+           print("Deleting old folder: " + full)
+           shutil.rmtree(full, ignore_errors=True)
     pass
 
 if __name__ == "__main__":

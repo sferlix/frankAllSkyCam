@@ -25,9 +25,8 @@ def imagePaste(jpg_file_name, filename, x_pos, y_pos, rot_angle):
     return
 
 
-def imagesPaste(images, jpg_file_name):
+def imagesPaste(images, background):
     homePath = os.path.expanduser("~") + "/frankAllSkyCam/"
-    background = Image.open(jpg_file_name)
 
     for i in images:
       printItem=images[i][0]
@@ -50,9 +49,7 @@ def imagesPaste(images, jpg_file_name):
       else:
          print("File " + c_filename + " not needed")
 
-    print("saving file...")
-    background.save(jpg_file_name,"jpeg")
-    return
+    return background
 
 
 def main():

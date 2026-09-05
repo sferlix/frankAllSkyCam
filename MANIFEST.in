@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include frankAllSkyCam/config.txt
+include frankAllSkyCam/index.html
+include frankAllSkyCam/sqmexp.csv
+recursive-include frankAllSkyCam/png *.png
+recursive-include frankAllSkyCam/tools *.py *.conf
+recursive-include frankAllSkyCam/log *.txt
+recursive-include frankAllSkyCam/img *.txt
+recursive-include frankAllSkyCam/sqm *.txt

@@ -37,30 +37,27 @@ x = datetime.datetime.now(tz)
 
 
 def launchStarTrail(inputFolder, outputFile):
-#    try:
         files = os.listdir(inputFolder)
         images = [name for name in files if name[-7:] in ["YTL.jpg", "YTL.JPG"]]
+
+        if not images:
+           print("No YTL frames found in " + inputFolder + " - skipping startrail.")
+           return
 
         width, height = Image.open(inputFolder+images[0]).size
         print(inputFolder+images[0])
 
-
-        stack   = numpy.zeros((height, width, 3), float)
+        stack   = numpy.zeros((height, width, 3), dtype = numpy.uint8)
         counter = 1
         for image in images:
-            image_new = numpy.array(Image.open(inputFolder+image), dtype = float)
+            image_new = numpy.array(Image.open(inputFolder+image), dtype = numpy.uint8)
             stack     = numpy.maximum(stack, image_new)
             counter  += 1
             print("stacking "+  str(image))
 
-        stack = numpy.array(numpy.round(stack), dtype = numpy.uint8)
         output = Image.fromarray(stack, mode = "RGB")
         output.save(outputFile, "JPEG")
-#    except:
-        print("exception")
-        myOutput = ""
-
-        return 
+        return
 
 
 def getStarTrailOutputFileName():

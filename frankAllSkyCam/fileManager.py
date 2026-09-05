@@ -59,6 +59,8 @@ def getConfigFileName():
     saturnFile= homePath + "/frankAllSkyCam/png/saturn.png"
     marsFile= homePath + "/frankAllSkyCam/png/mars.png"
     venusFile= homePath + "/frankAllSkyCam/png/venus.png"
+    genExtraDataFile = homePath + "/frankAllSkyCam/tools/generateExtraData.py"
+    toolsConfigFile = homePath + "/frankAllSkyCam/tools/generateExtraData.conf"
 
     if not os.path.isfile(fileName):
        #ensure folders do exist only if config.txt is not existing
@@ -67,19 +69,28 @@ def getConfigFileName():
     checkFile(fileName, "/config.txt")
     checkFile(htmlFile, "/index.html")
     checkFile(sqmExpCsv, "/sqmexp.csv")
-    checkFile(moonFile, "/moon.png")
-    checkFile(logoFile, "/logo.png")
-    checkFile(compFile, "/compass.png")
-    checkFile(jupiterFile, "/jupiter.png")
-    checkFile(marsFile, "/compass.png")
-    checkFile(saturnFile, "/saturn.png")
-    checkFile(venusFile, "/venus.png")
-    checkFile(phaseFile, "/moon.png")
+    checkFile(moonFile, "/png/moon.png")
+    checkFile(logoFile, "/png/logo.png")
+    checkFile(compFile, "/png/compass.png")
+    checkFile(jupiterFile, "/png/jupiter.png")
+    checkFile(marsFile, "/png/mars.png")
+    checkFile(saturnFile, "/png/saturn.png")
+    checkFile(venusFile, "/png/venus.png")
+    checkFile(phaseFile, "/png/moon.png")
+    # seeded only if missing, so a user's own edits survive package upgrades
+    checkFile(genExtraDataFile, "/tools/generateExtraData.py")
+    checkFile(toolsConfigFile, "/tools/generateExtraData.conf")
 
     return fileName
 
 def checkFile(destFileName, sourceFileName):
     if not os.path.isfile(destFileName):
+       # ensure the destination's directory exists - matters for files seeded
+       # into a subfolder (e.g. tools/) added after the initial install, when
+       # createAppFolders() (fresh-install only) never runs again
+       destDir = os.path.dirname(destFileName)
+       if destDir and not os.path.isdir(destDir):
+          createPath(destDir)
        cfd = os.path.dirname(os.path.realpath(__file__))
        copyFile(cfd + sourceFileName, destFileName)
 
@@ -99,6 +110,7 @@ def createAppFolders():
     imgDir = createPath(homePath + "/frankAllSkyCam/img")
     smqDir = createPath(homePath + "/frankAllSkyCam/sqm")
     smqDir = createPath(homePath + "/frankAllSkyCam/png")
+    toolsDir = createPath(homePath + "/frankAllSkyCam/tools")
     return
 
 def getOutputFileName(outputDir, today):

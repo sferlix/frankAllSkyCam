@@ -84,7 +84,7 @@ venus_x_pos = int(config['planets']['venus_x_pos'])
 venus_y_pos = int(config['planets']['venus_y_pos'])
 
 esp_secs = float(config['exposure']['esp_secs'])
-sqm_le = config['sqm']['use_sqm_le']
+use_sqm_le = config['sqm']['use_sqm_le']
 
 isFTP = str(config['ftp']['isFTP'])=='True'
 FTP_server = str(config['ftp']['FTP_server'])
@@ -102,7 +102,7 @@ def main():
     print("Execution started at: " +str(x))
 
     data = calculateEphem.calculate(x)
-    sqm = readsqm()
+    sqm, sqm_le = readsqm()
     exposure = calculateExposure(sqm)
 
     data["sqm"] = sqm
@@ -149,32 +149,16 @@ def main():
           extra_string = getextdata.getData(et_data_file)
           extra_text = [extra_string, et_font_size, et_font_color, et_x_pos, et_y_pos]
 
-       # print data dictionary on the allsky image
-       if exposure >0:
-          # calculate stars and clouds
-          data["stars"], data["clouds"] = analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30)
+       # calculate stars (night) and clouds (day or night)
+       print("calculating stars on: " + jpg_file_name)
+       exposure_secs = exposure / 1000000.0 if exposure > 0 else None
+       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=exposure_secs)
+       data["stars"] = sst
+       data["clouds"] = scl
    
 
-       drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)
+       photo = drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)
 
-       '''
-       # add compass png on the allsky image
-       if compass_filename != "":
-          print(compass_filename)
-          logos.imagePaste(jpg_file_name, compass_filename, compass_x_pos, compass_y_pos, compass_rot_angle)
-
-       # add logo png on the allsky image
-       if logo_filename != "":
-          print(logo_filename)
-          logos.imagePaste(jpg_file_name, logo_filename, logo_x_pos, logo_y_pos, 0)
-
-       # add moon phase image on the allsky image
-       if phase_filename != "":
-          print(phase_filename)
-          logos.imagePaste(jpg_file_name, phase_filename, phase_x_pos, phase_y_pos, 0)
-
-       print("before_logo")
-       '''
        images = {
            "logo": [logo_filename != "", logo_filename, logo_x_pos, logo_y_pos, 0],
            "phase":  [phase_filename != "", phase_filename, phase_x_pos, phase_y_pos, 0],
@@ -186,7 +170,8 @@ def main():
        }
 
        print(images)
-       logos.imagesPaste(images, jpg_file_name)
+       photo = logos.imagesPaste(images, photo)
+       photo.save(jpg_file_name, "jpeg")
 
        #generate /update alive.txt to say we are still alive
        textcommand = "touch " + logFolder +  "/alive.txt"
@@ -214,13 +199,17 @@ def main():
     return
 
 def readsqm():
+
    sq=0
+   le =""
    try:
-      sq = sqmreader.readSQM()
+
+      sq, le  = sqmreader.readSQM()
    except:
       print("Error while calculating SQM")
    print("sqm = " + str(sq))
-   return sq
+   print("sqm_le = " + str(le))
+   return sq, le
 
 def calculateExposure(sq):
    if sq < 9:
