@@ -150,7 +150,7 @@ nightTL = True   # allskycam_night.mp4, sunset to sunrise
 fullTL = True    # allskycam_24h.mp4, full day
 ```
 
-By default the video is smoothed on generation, since captures 1-2 minutes apart otherwise make stars visibly "jump" frame to frame rather than glide:
+By default the video is smoothed on generation, since captures a minute or more apart otherwise make stars visibly "jump" frame to frame rather than glide:
 
 ```ini
 smoothMotion = True   # tblend frame-blend for smoother apparent star motion
@@ -179,7 +179,9 @@ If it worked, you'll find the generated JPEG:
 python3 -m frankAllSkyCam.crontab
 ```
 
-This installs every scheduled job for you: captures (every 1-2 min, day/night-aware interval), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
+This installs every scheduled job for you: captures (every minute, day and night), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
+
+A capture that runs long (a slow exposure, or a slow FTP upload) is safe to overlap with the next scheduled one: an internal lock only ever covers the camera-touching part of a run (SQM measurement through the shot itself) - never analysis, watermarking, saving, or upload, none of which touch the camera. If the camera is still genuinely busy when the next run starts, it waits (up to 90s) rather than skipping or colliding with the capture in progress; past that, it assumes the other run is stuck and clears it before proceeding.
 
 Every job's output goes to its own log file under `~/frankAllSkyCam/log/`, so if anything misbehaves, that's the first place to check. Each file holds only the most recent run's output (overwritten every time, not appended) - `capture.log` in particular would otherwise grow forever given how often captures run.
 

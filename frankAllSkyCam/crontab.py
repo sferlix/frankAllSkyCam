@@ -79,8 +79,8 @@ def getTimes():
                   f.write(element)
 
               f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
-              f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
-              f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              f.write("*/1 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              f.write("*/1 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1\n")
               # generateExtraData.py lives outside the package (in ~/frankAllSkyCam/tools/,
               # user-editable, never overwritten by a package upgrade) so it's invoked by

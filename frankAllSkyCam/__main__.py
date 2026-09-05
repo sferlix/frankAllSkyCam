@@ -6,6 +6,7 @@
 import os
 import sys
 import csv
+import fcntl
 import datetime
 from fractions import Fraction
 import time
@@ -105,9 +106,54 @@ FTP_fileName = FTP_uploadFolder + "/" + FTP_fileNameAllSkyImg
 tz = timezone(time_zone)
 x = datetime.datetime.now(tz)
 
+# camera-exclusive section is SQM measurement (its own test shots also drive
+# libcamera-still, via sqmreader's getPseudoSQM) through the main capture -
+# nothing after that (analysis, watermark, save, FTP) touches the camera, so
+# it deliberately runs lock-free and may overlap the next run's camera phase.
+CAMERA_LOCK_PATH = logFolder + "/camera.lock"
+CAMERA_LOCK_RETRY_SECS = 5
+CAMERA_LOCK_MAX_WAIT_SECS = 90  # past this, assume the other run is stuck, not just slow
+
+def _acquireCameraLock():
+    fileManager.createPath(logFolder)
+    fd = open(CAMERA_LOCK_PATH, "w")
+    waited = 0
+    while True:
+       try:
+          fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+          return fd
+       except BlockingIOError:
+          if waited >= CAMERA_LOCK_MAX_WAIT_SECS:
+             print("WARNING: camera busy for " + str(waited) + "s - assuming the other run is stuck, killing libcamera")
+             os.system("ps -ef|grep libcamera | grep -v color|awk '{print $2}'|xargs kill -9 1> /dev/null 2>&1")
+             time.sleep(1)
+             try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return fd
+             except BlockingIOError:
+                print("ERROR: still could not get the camera lock after cleanup - skipping this cycle")
+                fd.close()
+                return None
+          print("Camera busy (another run still capturing), waiting " + str(CAMERA_LOCK_RETRY_SECS) + "s...")
+          time.sleep(CAMERA_LOCK_RETRY_SECS)
+          waited += CAMERA_LOCK_RETRY_SECS
+
+def _releaseCameraLock(fd):
+    if fd is not None and not fd.closed:
+       try:
+          fcntl.flock(fd, fcntl.LOCK_UN)
+       except OSError:
+          pass
+       fd.close()
+
 def main():
 
     print("Execution started at: " +str(x))
+
+    cameraLock = _acquireCameraLock()
+    if cameraLock is None:
+       print("Skipping this cycle - camera unavailable.")
+       return
 
     data = calculateEphem.calculate(x)
     sqm, sqm_le = readsqm()
@@ -150,16 +196,17 @@ def main():
        command += additional_day_params
 
     try:
-       # ensure no libcamera is operating
-       killcmd = "ps -ef|grep libcamera | grep -v color|awk '{print $2}'|xargs kill -9 1> /dev/null 2>&1"
-       os.system(killcmd)
-       print(killcmd)
-
        #launch the command line
        print(command)
        os.system(command)
 
        print("Image captured")
+
+       # release the camera lock now - nothing from here on (analysis,
+       # watermark, save, FTP upload) touches libcamera, so it must not
+       # block the next scheduled run's own SQM measurement/capture
+       _releaseCameraLock(cameraLock)
+       cameraLock = None
 
        extra_text = [""]
        if et_use =="y":
@@ -209,6 +256,9 @@ def main():
        pass
        return
     finally:
+       # safety net - no-op if already released right after capture above;
+       # guarantees the lock never leaks if an error occurred before that point
+       _releaseCameraLock(cameraLock)
        z=datetime.datetime.now(tz)
        print("Execution time: " + str(abs(z-x).seconds) +" secs")
 
