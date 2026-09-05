@@ -14,6 +14,7 @@ from PIL import Image
 from PIL import ImageStat
 import socket
 import math
+import re
 from functools import lru_cache
 from frankAllSkyCam import fileManager
 from configparser import ConfigParser
@@ -76,6 +77,8 @@ def main():
     print("Configuration")
     print("-------------------------")
     print("SQM_LE    = " + SQM_LE)
+    print("SQM_LE_IP   = " + SQM_LE_IP)
+    print("SQM_LE_PORT = " + str(SQM_LE_PORT))
     print("SQM_LOG   = "+ SQM_LOG)
     print("SQM_DEBUG = " + SQM_DEBUG )
     print("-------------------------")
@@ -236,6 +239,8 @@ def logInfo(secs, rms, model, psqm, sqm):
 
 
 
+SQM_LE_RESPONSE_RE = re.compile(rb"r,\s*([\d.]+)m")
+
 def getRealSQM(ip, port):
     max_retries=3
     base_delay = 2
@@ -246,22 +251,29 @@ def getRealSQM(ip, port):
             with socket.create_connection((ip, int(port)), timeout=3) as s:
                 s.sendall(b'rx')
                 print("SQM Socket open")
-                # Ricezione sicura con buffer di byte
+                # accumulate until the device closes the connection (it does,
+                # after a single reply) rather than assuming a fixed length -
+                # the real SQM-LE response format ("r, 19.44m,0000000850Hz,
+                # 0000000000c,0038.7C") isn't always exactly the same length
                 data = b""
-                while len(data) < 55:
-                    chunk = s.recv(55 - len(data))
+                while len(data) < 128:
+                    chunk = s.recv(128 - len(data))
                     if not chunk: break
                     data += chunk
-                print(data[5:10])
-                # Parsing immediato: se i dati sono insufficienti, solleva IndexError
-                return float(data[5:10])
+                print(data)
+                # parse the magnitude out by pattern, not by a fixed byte
+                # offset - a hardcoded slice breaks the moment the response
+                # length differs even slightly from what was assumed
+                match = SQM_LE_RESPONSE_RE.search(data)
+                if not match:
+                    raise ValueError("unrecognized SQM-LE response: " + repr(data))
+                return float(match.group(1))
 
-        except (socket.timeout, socket.error, ValueError, IndexError):
-            print(socket.error)
+        except (socket.timeout, socket.error, ValueError, IndexError) as e:
+            print("SQM-LE read failed: " + repr(e))
             if i == max_retries - 1:
                 return -1.0
-                break
-            # Ritardo crescente: 2s, 4s, 8s, 16s
+            # Ritardo crescente: 2s, 4s, 8s
             print("Ritardo " + str(base_delay * (2**i)))
             time.sleep(base_delay * (2 ** i))
 
