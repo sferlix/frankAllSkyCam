@@ -5,13 +5,14 @@
 
 import os
 import sys
+import csv
 import datetime
 from fractions import Fraction
 import time
 from pytz import timezone
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, starscalc
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -84,6 +85,13 @@ venus_x_pos = int(config['planets']['venus_x_pos'])
 venus_y_pos = int(config['planets']['venus_y_pos'])
 
 esp_secs = float(config['exposure']['esp_secs'])
+# exposure_mode/[auto_exposure] are optional - fallback() keeps this working
+# on existing config.txt files that predate this feature (no re-seeding).
+exposure_mode = config.get('exposure', 'exposure_mode', fallback='sqm_based')
+ae_target_mean = config.getfloat('auto_exposure', 'target_mean', fallback=30.0)
+ae_roi_percent = config.getfloat('auto_exposure', 'roi_percent', fallback=70.0)
+ae_min_exposure_secs = config.getfloat('auto_exposure', 'min_exposure_secs', fallback=1.0)
+ae_seed_exposure_secs = config.getfloat('auto_exposure', 'seed_exposure_secs', fallback=5.0)
 use_sqm_le = config['sqm']['use_sqm_le']
 
 isFTP = str(config['ftp']['isFTP'])=='True'
@@ -128,6 +136,16 @@ def main():
        exposure = exposure * 1000000
        command +=" --shutter " + str(int(exposure)) + " "
        command += additional_night_params
+       # fixed at night regardless of additional_night_params: the ISP's default
+       # denoise/sharpen/contrast are tuned for daylight video and actively work
+       # against faint point sources (denoise treats a 1-2px star as noise;
+       # contrast stretch crushes it toward black). --mode pins the sensor's
+       # true 2x2-binned full-FOV readout (imx477: 2028x1520) instead of letting
+       # libcamera guess a mode - binning sums photosite charge before
+       # quantization, giving real SNR gain per pixel rather than a digital
+       # downscale of the full-res frame. Placed last so these always win over
+       # any conflicting flag in additional_night_params.
+       command += " --mode 2028:1520:12 --denoise cdn_off --sharpness 0 --contrast 1.0 "
     else:
        command += additional_day_params
 
@@ -155,7 +173,15 @@ def main():
        sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=exposure_secs)
        data["stars"] = sst
        data["clouds"] = scl
-   
+
+       if exposure_secs is not None:
+          # feed this run's own raw (pre-watermark) frame back into the
+          # auto-exposure state file, regardless of which mode is active,
+          # so switching to auto_exposure later doesn't start cold. Day
+          # captures (exposure_secs None) aren't tracked - the ISP drives
+          # exposure itself in daylight, this feedback loop doesn't apply.
+          autoexposure.recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=ae_roi_percent)
+
 
        photo = drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)
 
@@ -215,8 +241,33 @@ def calculateExposure(sq):
    if sq < 9:
       # no need to change the exposure.
       return 0
-   ex = exposurecalc.getExposure(sq)
+
+   # compute both predictions every time (the inactive one is cheap: pure
+   # sqm math, or a JSON state-file read) so exposure_compare.csv always has
+   # both sides for comparison, whichever mode is actually driving capture.
+   sqm_based_ex = exposurecalc.getExposure(sq, esp_secs=esp_secs, appPath=appPath)
+   auto_ex = autoexposure.getExposure(sq, esp_secs=esp_secs, appPath=appPath,
+                                       target_mean=ae_target_mean,
+                                       min_exposure_secs=ae_min_exposure_secs,
+                                       seed_exposure_secs=ae_seed_exposure_secs)
+
+   ex = auto_ex if exposure_mode == "auto_exposure" else sqm_based_ex
+
+   logExposureComparison(sq, sqm_based_ex, auto_ex, ex)
+
    return ex
+
+def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex):
+   csv_path = logFolder + "/exposure_compare.csv"
+   file_exists = os.path.exists(csv_path)
+   try:
+      with open(csv_path, "a", newline="") as f:
+         writer = csv.writer(f)
+         if not file_exists:
+            writer.writerow(["timestamp", "sqm", "exposure_mode", "sqm_based_secs", "auto_exposure_secs", "applied_secs"])
+         writer.writerow([datetime.datetime.now(tz).isoformat(), sq, exposure_mode, sqm_based_ex, auto_ex, applied_ex])
+   except Exception as e:
+      print("WARNING: could not write exposure_compare.csv: " + str(e))
 
 
 if __name__ == "__main__":

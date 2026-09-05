@@ -66,20 +66,23 @@ def getConfigFileName():
        #ensure folders do exist only if config.txt is not existing
        createAppFolders()
 
-    checkFile(fileName, "/config.txt")
-    checkFile(htmlFile, "/index.html")
-    checkFile(sqmExpCsv, "/sqmexp.csv")
-    checkFile(moonFile, "/png/moon.png")
-    checkFile(logoFile, "/png/logo.png")
-    checkFile(compFile, "/png/compass.png")
-    checkFile(jupiterFile, "/png/jupiter.png")
-    checkFile(marsFile, "/png/mars.png")
-    checkFile(saturnFile, "/png/saturn.png")
-    checkFile(venusFile, "/png/venus.png")
-    checkFile(phaseFile, "/png/moon.png")
+    # every package-bundled seed template lives under defaults/, not loose
+    # among the .py files - so nothing in site-packages can be mistaken for
+    # the live copy (what every module actually reads/uses at runtime)
+    checkFile(fileName, "/defaults/config.txt")
+    checkFile(htmlFile, "/defaults/tools/index.html")
+    checkFile(sqmExpCsv, "/defaults/sqmexp.csv")
+    checkFile(moonFile, "/defaults/png/moon.png")
+    checkFile(logoFile, "/defaults/png/logo.png")
+    checkFile(compFile, "/defaults/png/compass.png")
+    checkFile(jupiterFile, "/defaults/png/jupiter.png")
+    checkFile(marsFile, "/defaults/png/mars.png")
+    checkFile(saturnFile, "/defaults/png/saturn.png")
+    checkFile(venusFile, "/defaults/png/venus.png")
+    checkFile(phaseFile, "/defaults/png/moon.png")
     # seeded only if missing, so a user's own edits survive package upgrades
-    checkFile(genExtraDataFile, "/tools/generateExtraData.py")
-    checkFile(toolsConfigFile, "/tools/generateExtraData.conf")
+    checkFile(genExtraDataFile, "/defaults/tools/generateExtraData.py")
+    checkFile(toolsConfigFile, "/defaults/tools/generateExtraData.conf")
 
     return fileName
 

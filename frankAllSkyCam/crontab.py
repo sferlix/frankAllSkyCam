@@ -78,21 +78,21 @@ def getTimes():
               for element in linesToAdd:
                   f.write(element)
 
-              f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >> " + logFolder + "/capture.log 2>&1\n")
-              f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >> " + logFolder + "/capture.log 2>&1\n")
-              f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >> " + logFolder + "/capture.log 2>&1\n")
-              f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >> " + logFolder + "/watchdog.log 2>&1\n")
+              f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1\n")
               # generateExtraData.py lives outside the package (in ~/frankAllSkyCam/tools/,
               # user-editable, never overwritten by a package upgrade) so it's invoked by
               # absolute path rather than -m
               # also handles dew heater switching (merged from the former checkdew.py,
               # to avoid polling the same temp/dewpoint sensors from two separate jobs)
-              f.write("*/5 * * * * python3 " + appPath + "tools/generateExtraData.py >> " + logFolder + "/generateExtraData.log 2>&1\n")
-              f.write("0 1 * * * python3 -m frankAllSkyCam.allskycamdelete >> " + logFolder + "/allskycamdelete.log 2>&1\n")
-              f.write("50 7 * * * python3 -m frankAllSkyCam.startrail >> " + logFolder + "/startrail.log 2>&1\n")
-              f.write("0 8 * * * python3 -m frankAllSkyCam.timelapse >> " + logFolder + "/timelapse.log 2>&1\n")
-              f.write("0 */6 * * * python3 -m frankAllSkyCam.calculateEphem >> " + logFolder + "/calculateEphem.log 2>&1\n")
-              f.write("0 0 1 1 * python3 -m frankAllSkyCam.crontab >> " + logFolder + "/crontab.log 2>&1\n")
+              f.write("*/5 * * * * python3 " + appPath + "tools/generateExtraData.py >" + logFolder + "/generateExtraData.log 2>&1\n")
+              f.write("0 1 * * * python3 -m frankAllSkyCam.allskycamdelete >" + logFolder + "/allskycamdelete.log 2>&1\n")
+              f.write("50 7 * * * python3 -m frankAllSkyCam.startrail >" + logFolder + "/startrail.log 2>&1\n")
+              f.write("0 8 * * * python3 -m frankAllSkyCam.timelapse >" + logFolder + "/timelapse.log 2>&1\n")
+              f.write("0 */6 * * * python3 -m frankAllSkyCam.calculateEphem >" + logFolder + "/calculateEphem.log 2>&1\n")
+              f.write("0 0 1 1 * python3 -m frankAllSkyCam.crontab >" + logFolder + "/crontab.log 2>&1\n")
               f.close()
 
               os.system("crontab -r")

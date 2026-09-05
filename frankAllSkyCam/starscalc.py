@@ -137,7 +137,7 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
         return 0, 100.0
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    roi = _roi_mask(gray, diametro_rapporto)
+    roi = roi_mask(gray, diametro_rapporto)
 
     if gray[roi == 255].mean() > DAYTIME_MEAN_THRESHOLD:
         return _analyze_day(img, gray, roi)
@@ -195,7 +195,9 @@ def _erode_guard_band(sky):
     return sky_eroded
 
 
-def _roi_mask(gray, ratio):
+def roi_mask(gray, ratio):
+    # shared with autoexposure.py: ratio=1.0 -> full width, ratio=0.5 -> circle
+    # diameter = 50% of image width, centered in frame
     height, width = gray.shape[:2]
     mask = np.zeros((height, width), dtype=np.uint8)
     radius = int((width * ratio) / 2)

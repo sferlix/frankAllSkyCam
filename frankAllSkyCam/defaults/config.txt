@@ -42,7 +42,11 @@ picture_rotation = 0
 # may personalize the libcamara params.
 # please DO NOT set --shutter, --immediate
 # night parameters will be used only when exposure > 0
-additional_night_params = --gain 14 --awbgains 2.7,1.5 --contrast 1.5
+# NOTE: --denoise cdn_off, --sharpness 0 and --contrast 1.0 are applied by
+# frankAllSkyCam at night regardless of what's set here (they preserve faint
+# stars that the ISP's default daylight-tuned processing would otherwise
+# suppress/crush) - don't set --contrast here for night, it will be overridden.
+additional_night_params = --gain 14 --awbgains 2.7,1.5
 additional_day_params = --metering average
 
 
@@ -152,6 +156,27 @@ venus_y_pos = 52
 #  for dark sky, suggested value is 55-60 (I found 55 secs ok for sqm 21,3).
 #  this value only limits the max exposure. The calculated or real SQM will drive exposure
 esp_secs =60
+
+# how night exposure is decided:
+#  sqm_based    - predict exposure from a pre-calibrated SQM curve (sqmexp.csv). Default.
+#  auto_exposure - measure the previous frame's own brightness and adjust
+#                  toward target_mean below. No sqmexp.csv calibration needed,
+#                  but needs a few runs to converge and reacts a run late to
+#                  fast sky changes (clouds moving in, moonrise).
+exposure_mode = sqm_based
+
+[auto_exposure]
+# only used when exposure_mode = auto_exposure above
+# target mean brightness (0-255) inside the ROI below; tune per site/lens
+target_mean = 30
+# circular ROI used to measure brightness, centered in frame - excludes fixed
+# dark obstructions (roofline, trees) near the edges from skewing the mean.
+# 100 = full image width, 70 = circle whose diameter is 70% of image width.
+roi_percent = 70
+# floor so the feedback loop can't collapse exposure toward zero
+min_exposure_secs = 1
+# used only for the very first run, before any state file exists yet
+seed_exposure_secs = 5
 
 [ftp]
 # if True, allSkyCam image, timelapse and startrails

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frankAllSkyCam"
-version = "12"
+version = "13"
 description = "AllSky camera software for Raspberry Pi + Pi HQ Camera: automated capture, watermarking, timelapses, startrails, and day/night cloud & star detection."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
@@ -44,12 +44,12 @@ packages = ["frankAllSkyCam"]
 
 [tool.setuptools.package-data]
 frankAllSkyCam = [
-    "config.txt",
-    "index.html",
-    "sqmexp.csv",
-    "png/*.png",
-    "tools/*.py",
-    "tools/*.conf",
+    "defaults/config.txt",
+    "defaults/sqmexp.csv",
+    "defaults/png/*.png",
+    "defaults/tools/*.py",
+    "defaults/tools/*.conf",
+    "defaults/tools/index.html",
     "log/*.txt",
     "img/*.txt",
     "sqm/*.txt",

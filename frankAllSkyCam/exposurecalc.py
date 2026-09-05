@@ -21,7 +21,9 @@ def main(argv):
     print("SQM: " + str(sqm_value) + " => Exposure (secs): " + str(ret))
     return
 
-def getExposure(sq):
+def getExposure(sq, esp_secs=None, appPath=None):
+   # esp_secs/appPath accepted (and ignored) so this shares an interface with
+   # autoexposure.getExposure() - exposure_mode in config.txt picks between them
 
    if sq < 9:
       # no need to change the exposure.

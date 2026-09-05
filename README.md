@@ -170,7 +170,7 @@ python3 -m frankAllSkyCam.crontab
 
 This installs every scheduled job for you: captures (every 1-2 min, day/night-aware interval), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
 
-Every job's output now goes to its own log file under `~/frankAllSkyCam/log/`, so if anything misbehaves, that's the first place to check.
+Every job's output goes to its own log file under `~/frankAllSkyCam/log/`, so if anything misbehaves, that's the first place to check. Each file holds only the most recent run's output (overwritten every time, not appended) - `capture.log` in particular would otherwise grow forever given how often captures run.
 
 ### Enjoy it!
 
@@ -196,7 +196,11 @@ Exposure duration is predicted from SQM via a small polynomial model, trained fr
 
 Add or adjust pairs to retune the curve for your own site/camera/gain settings - the software interpolates (degree-3 polynomial regression) between the values you provide. The `esp_secs` parameter in `config.txt` always caps the maximum exposure regardless of what the model predicts.
 
-You can also fully customize the `libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, contrast, anything `libcamera-still` accepts (just don't set `--shutter` or `--immediate` there, those are managed for you).
+You can also fully customize the `libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, anything `libcamera-still` accepts (just don't set `--shutter`, `--immediate`, `--mode`, `--denoise`, `--sharpness` or `--contrast` there - those are fixed by frankAllSkyCam at night, since the ISP's daylight-tuned defaults for denoise/sharpen/contrast actively suppress faint stars, and `--mode` pins a true 2x2-binned, full-FOV sensor readout for better low-light sensitivity per pixel - not just a wider `--gain`).
+
+### Alternative exposure strategy: auto_exposure
+
+By default (`exposure_mode = sqm_based` in `config.txt`'s `[exposure]` section) night exposure is predicted from the SQM curve above. Setting `exposure_mode = auto_exposure` switches to a feedback-driven alternative instead: each run measures the previous capture's own brightness (inside a circular ROI - `[auto_exposure] roi_percent`, excluding fixed dark obstructions near the frame edges) and adjusts the next exposure toward `target_mean`, with no `sqmexp.csv` calibration needed. It reacts a run late to fast sky changes (clouds moving in, moonrise) since the feedback is carried across runs via a small state file, not live. Whichever mode is active, both predictions are logged side by side to `~/frankAllSkyCam/log/exposure_compare.csv` every run, so you can compare them before committing to a switch.
 
 ## Requirements
 
