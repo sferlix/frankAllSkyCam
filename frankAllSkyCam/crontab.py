@@ -122,8 +122,12 @@ def readCrontab():
         if not line:
             break
 
-        if " frankAllSkyCam" not in line:
-            # save this line
+        if "frankAllSkyCam" not in line:
+            # save this line. NOTE: no leading space in the check - the
+            # generateExtraData.py job is invoked by absolute path (it lives
+            # outside the package), so "frankAllSkyCam" there is preceded by
+            # "/" rather than a space, and a space-anchored check would never
+            # match it - leaving a stale copy every time this script re-runs.
             crontabLines.append(line)
 
 
