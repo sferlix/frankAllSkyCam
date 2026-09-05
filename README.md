@@ -68,6 +68,8 @@ You should see it capture and leave a `test.jpg` in the current folder.
 pip3 install frankAllSkyCam
 ```
 
+This pulls in all required Python dependencies automatically (`pytz`, `numpy`, `ephem`, `Wand`, `opencv-python-headless`, `Pillow`, `requests`) - nothing else to install by hand. One thing to expect on a fresh Pi: `opencv-python-headless` doesn't always have a prebuilt wheel for every Raspberry Pi OS / Python version combination, and when pip has to fall back to building it from source, that single step can take a long time (tens of minutes) on a Pi. Let it run - it only happens once, not on every `pip install --upgrade`.
+
 Then launch it once, so it can bootstrap your configuration:
 
 ```
@@ -204,7 +206,7 @@ By default (`exposure_mode = sqm_based` in `config.txt`'s `[exposure]` section) 
 
 ## Requirements
 
-Installed automatically via pip: `pytz`, `numpy`, `ephem`, `Wand`, `opencv-python-headless`, `Pillow`, `requests`. Python 3.9+.
+Installed automatically via pip: `pytz`, `numpy`, `ephem`, `Wand`, `opencv-python-headless`, `Pillow`, `requests`. Python 3.9+. See the note under [Install frankAllSkyCam](#2-install-frankallskycam) about `opencv-python-headless` sometimes needing a slow source build on a Pi.
 
 If you use the optional sensor examples in `tools/generateExtraData.py` that read Raspberry Pi hardware directly (CPU temperature, an I2C sensor, GPIO-driven relays), they rely on `gpiozero`, `smbus`/`smbus2`, and `RPi.GPIO` - all pre-installed on Raspberry Pi OS, no extra steps needed.
 
