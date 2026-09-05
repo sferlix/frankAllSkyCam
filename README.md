@@ -213,7 +213,9 @@ You can also fully customize the `libcamera-still` invocation via `additional_ni
 
 ### Alternative exposure strategy: auto_exposure
 
-By default (`exposure_mode = sqm_based` in `config.txt`'s `[exposure]` section) night exposure is predicted from the SQM curve above. Setting `exposure_mode = auto_exposure` switches to a feedback-driven alternative instead: each run measures the previous capture's own brightness (inside a circular ROI - `[auto_exposure] roi_percent`, excluding fixed dark obstructions near the frame edges) and adjusts the next exposure toward `target_mean`, with no `sqmexp.csv` calibration needed. It reacts a run late to fast sky changes (clouds moving in, moonrise) since the feedback is carried across runs via a small state file, not live. Whichever mode is active, both predictions are logged side by side to `~/frankAllSkyCam/log/exposure_compare.csv` every run, so you can compare them before committing to a switch.
+By default (`exposure_mode = auto_exposure` in `config.txt`'s `[exposure]` section) each run measures the previous capture's own brightness (inside a circular ROI - `[auto_exposure] roi_percent`, excluding fixed dark obstructions near the frame edges) and adjusts the next exposure toward `target_mean`, with no `sqmexp.csv` calibration needed. It reacts a run late to fast sky changes (clouds moving in, moonrise) since the feedback is carried across runs via a small state file, not live. Setting `exposure_mode = sqm_based` switches back to predicting exposure from the pre-calibrated SQM curve above instead. Whichever mode is active, both predictions are logged side by side to `~/frankAllSkyCam/log/exposure_compare.csv` every run, so you can compare them before committing to a switch.
+
+Note this default only applies to a fresh install - if you're upgrading an existing install, your `config.txt` keeps whatever it already has (nothing overwrites it), so add `exposure_mode = auto_exposure` under `[exposure]` yourself if you want to switch.
 
 ## Requirements
 

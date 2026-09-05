@@ -171,12 +171,12 @@ venus_y_pos = 52
 esp_secs =60
 
 # how night exposure is decided:
-#  sqm_based    - predict exposure from a pre-calibrated SQM curve (sqmexp.csv). Default.
 #  auto_exposure - measure the previous frame's own brightness and adjust
 #                  toward target_mean below. No sqmexp.csv calibration needed,
 #                  but needs a few runs to converge and reacts a run late to
-#                  fast sky changes (clouds moving in, moonrise).
-exposure_mode = sqm_based
+#                  fast sky changes (clouds moving in, moonrise). Default.
+#  sqm_based    - predict exposure from a pre-calibrated SQM curve (sqmexp.csv).
+exposure_mode = auto_exposure
 
 [auto_exposure]
 # only used when exposure_mode = auto_exposure above
