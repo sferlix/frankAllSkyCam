@@ -13,7 +13,7 @@ import time
 from pytz import timezone
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -149,9 +149,33 @@ def _releaseCameraLock(fd):
           pass
        fd.close()
 
+def _logExecutionTime(start):
+    # single measurement point for the whole run (capture, analysis,
+    # watermark, FTP upload) regardless of which path main() exits through -
+    # appended, not overwritten, since capture.log itself is overwritten by
+    # every cron invocation (crontab.py's ">") and so can't show a trend
+    # across runs/nights the way this file can.
+    end = datetime.datetime.now(tz)
+    duration = round((end - start).total_seconds(), 1)
+    print("Execution time: " + str(duration) + " secs")
+    try:
+       with open(logFolder + "/execution_time.log", "a") as f:
+          f.write(start.isoformat() + "," + end.isoformat() + "," + str(duration) + "\n")
+    except OSError as e:
+       print("WARNING: could not append to execution_time.log: " + str(e))
+
+
 def main():
 
     print("Execution started at: " +str(x))
+
+    try:
+       _run()
+    finally:
+       _logExecutionTime(x)
+
+
+def _run():
 
     cameraLock = _acquireCameraLock()
     if cameraLock is None:
@@ -236,9 +260,18 @@ def main():
           extra_string = getextdata.getData(et_data_file)
           extra_text = [extra_string, et_font_size, et_font_color, et_x_pos, et_y_pos]
 
+       exposure_secs = exposure / 1000000.0 if exposure > 0 else None
+
+       if exposure_secs is not None:
+          # static hot-pixel correction (see hotpixels.py) - no-op unless
+          # appPath/hotpixels.json exists for this install. Runs before
+          # star/cloud detection and the watermark overlay, on the raw
+          # captured frame still at jpg_file_name, same requirement as
+          # autoexposure.recordExposureResult below.
+          hotpixels.applyToFile(jpg_file_name, appPath)
+
        # calculate stars (night) and clouds (day or night)
        print("calculating stars on: " + jpg_file_name)
-       exposure_secs = exposure / 1000000.0 if exposure > 0 else None
        sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=exposure_secs)
        data["stars"] = sst
        data["clouds"] = scl
@@ -281,8 +314,6 @@ def main():
        # safety net - no-op if already released right after capture above;
        # guarantees the lock never leaks if an error occurred before that point
        _releaseCameraLock(cameraLock)
-       z=datetime.datetime.now(tz)
-       print("Execution time: " + str(abs(z-x).seconds) +" secs")
 
     time.sleep(1)
 
