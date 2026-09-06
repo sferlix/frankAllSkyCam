@@ -90,5 +90,9 @@ def applyToFile(jpg_file_name, appPath):
         return False
 
     corrected = correctImage(image, coords)
-    cv2.imwrite(jpg_file_name, corrected)
+    # starscalc/autoexposure/drawtext all re-read this file from disk rather
+    # than taking an in-memory array, so this write can't be avoided - but
+    # quality 100 (vs cv2's default ~95) keeps it as close to lossless as a
+    # JPEG re-encode gets, since the final watermark save re-encodes again.
+    cv2.imwrite(jpg_file_name, corrected, [cv2.IMWRITE_JPEG_QUALITY, 100])
     return True
