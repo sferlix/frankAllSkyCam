@@ -13,7 +13,7 @@ import time
 from pytz import timezone
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -263,12 +263,20 @@ def _run():
        exposure_secs = exposure / 1000000.0 if exposure > 0 else None
 
        if exposure_secs is not None:
-          # static hot-pixel correction (see hotpixels.py) - no-op unless
-          # appPath/hotpixels.json exists for this install. Runs before
-          # star/cloud detection and the watermark overlay, on the raw
-          # captured frame still at jpg_file_name, same requirement as
-          # autoexposure.recordExposureResult below.
-          hotpixels.applyToFile(jpg_file_name, appPath)
+          # dark frame subtraction (see darksubtract.py) is the primary
+          # correction - no-op unless appPath/darks/manifest.json exists
+          # for this install AND matches today's night params exactly.
+          # Falls back to the coordinate-list correction (hotpixels.py) if
+          # no valid dark library is present - cheaper to set up (no
+          # physical dome-covering step) but only corrects pre-calibrated
+          # coordinates rather than the whole dark-current pattern. Both
+          # run before star/cloud detection and the watermark overlay, on
+          # the raw captured frame still at jpg_file_name, same
+          # requirement as autoexposure.recordExposureResult below.
+          if not darksubtract.applyToFile(jpg_file_name, appPath, exposure_secs,
+                                           additional_night_params, night_mode,
+                                           night_sharpness, night_contrast):
+             hotpixels.applyToFile(jpg_file_name, appPath)
 
        # calculate stars (night) and clouds (day or night)
        print("calculating stars on: " + jpg_file_name)
