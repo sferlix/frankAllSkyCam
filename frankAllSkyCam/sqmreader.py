@@ -88,13 +88,25 @@ def main():
     return sqm, str(SQM_LE)
 
 
-def readSQM(skip_pseudo=False):
+def readSQM(daytime=False):
     s = 0
     sqm = 0
     ret = 0
     sqm_le = SQM_LE
     print("starting readSQM")
     #print("  SQM_LE =" + SQM_LE)
+
+    if daytime:
+       # full daytime (sun above horizon, set by the caller from sun
+       # position): frankAllSkyCam never needs an SQM value here at all -
+       # calculateExposure() always returns 0 regardless of it - so this
+       # skips the SQM-LE hardware read too, not just the camera-based
+       # pseudo-SQM fallback below. A previous version kept the hardware
+       # read running during the day on the assumption a cheap network call
+       # was harmless to leave on, but daytime SQM should never be computed
+       # at all, hardware or not.
+       print("Full daytime - skipping SQM measurement entirely")
+       return 0, sqm_le
 
     if SQM_LE == "y":
        print("SQM-LE Reading:")
@@ -103,13 +115,9 @@ def readSQM(skip_pseudo=False):
           sqm_le = "n"
 
     # getPseudoSQM() takes real camera test shots (takePicture, up to a 5s
-    # exposure) to estimate sky brightness - worth it at night/twilight, but
-    # pure waste in full daylight, where the exposure decision downstream
-    # ignores sqm entirely regardless of its value. skip_pseudo (set by the
-    # caller from sun position) short-circuits just this fallback; a real
-    # SQM-LE hardware reading above (cheap network call) is unaffected either
-    # way, so its own daytime logging keeps working undisturbed.
-    if not skip_pseudo and (SQM_DEBUG=="y" or sqm_le=="n"):
+    # exposure) to estimate sky brightness - worth it at night/twilight,
+    # already skipped above for full daytime by the early return.
+    if SQM_DEBUG=="y" or sqm_le=="n":
        if sqm_le == "n":
           print("Problem with SQM_LE. Switching to PseudoSQM")
        print("Calculated SQM:")

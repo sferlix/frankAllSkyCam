@@ -156,15 +156,11 @@ def main():
        return
 
     data = calculateEphem.calculate(x)
-    # full daytime (sun above horizon, isTimelapse False) never needs the
-    # camera-based pseudo-SQM fallback: calculateExposure() always returns 0
-    # regardless of sqm during the day, so estimating sky brightness via
-    # camera test shots (getPseudoSQM -> takePicture) would only waste time.
-    # A real SQM-LE hardware reading (cheap network call) still runs and still
-    # gets logged during the day either way - only the pseudo fallback is
-    # skipped, so a debug log row that would have carried a computed cSQM
-    # comparison now carries 0 for that column during the day instead.
-    sqm, sqm_le = readsqm(skip_pseudo=not data["isTimelapse"])
+    # full daytime (sun above horizon, isTimelapse False): frankAllSkyCam
+    # never computes SQM at all here, hardware reading or camera-based
+    # pseudo-SQM - calculateExposure() always returns 0 regardless of sqm
+    # during the day, so there is nothing for a reading to drive.
+    sqm, sqm_le = readsqm(daytime=not data["isTimelapse"])
     exposure = calculateExposure(sqm)
 
     data["sqm"] = sqm
@@ -286,13 +282,13 @@ def main():
     print("AllSkyCam is done.")
     return
 
-def readsqm(skip_pseudo=False):
+def readsqm(daytime=False):
 
    sq=0
    le =""
    try:
 
-      sq, le  = sqmreader.readSQM(skip_pseudo=skip_pseudo)
+      sq, le  = sqmreader.readSQM(daytime=daytime)
    except Exception as e:
       # bare "except: print(...)" (no message) used to swallow the actual
       # error, and left sq=0 - indistinguishable from a genuine full-daytime
