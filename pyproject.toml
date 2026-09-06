@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frankAllSkyCam"
-version = "19"
+version = "20"
 description = "AllSky camera software for Raspberry Pi + Pi HQ Camera: automated capture, watermarking, timelapses, startrails, and day/night cloud & star detection."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }

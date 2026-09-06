@@ -42,10 +42,12 @@ picture_rotation = 0
 # may personalize the libcamara params.
 # please DO NOT set --shutter, --immediate
 # night parameters will be used only when exposure > 0
-# NOTE: --denoise cdn_off, --sharpness 0 and --contrast 1.0 are applied by
+# NOTE: --denoise cdn_hq, --sharpness 0 and --contrast 1.0 are applied by
 # frankAllSkyCam at night regardless of what's set here (they preserve faint
 # stars that the ISP's default daylight-tuned processing would otherwise
-# suppress/crush) - don't set --contrast here for night, it will be overridden.
+# suppress/crush, while cdn_hq's colour-only denoise removes red/purple hot-
+# pixel speckle from long exposures) - don't set --denoise or --contrast here
+# for night, they will be overridden.
 additional_night_params = --gain 14 --awbgains 2.7,1.5
 additional_day_params = --metering average
 

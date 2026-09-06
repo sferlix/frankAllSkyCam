@@ -183,15 +183,22 @@ def main():
        command +=" --shutter " + str(int(exposure)) + " "
        command += additional_night_params
        # fixed at night regardless of additional_night_params: the ISP's default
-       # denoise/sharpen/contrast are tuned for daylight video and actively work
-       # against faint point sources (denoise treats a 1-2px star as noise;
-       # contrast stretch crushes it toward black). --mode pins the sensor's
-       # true 2x2-binned full-FOV readout (imx477: 2028x1520) instead of letting
-       # libcamera guess a mode - binning sums photosite charge before
-       # quantization, giving real SNR gain per pixel rather than a digital
-       # downscale of the full-res frame. Placed last so these always win over
-       # any conflicting flag in additional_night_params.
-       command += " --mode 2028:1520:12 --denoise cdn_off --sharpness 0 --contrast 1.0 "
+       # sharpen/contrast are tuned for daylight video and actively work
+       # against faint point sources (contrast stretch crushes a 1-2px star
+       # toward black). --mode pins the sensor's true 2x2-binned full-FOV
+       # readout (imx477: 2028x1520) instead of letting libcamera guess a mode
+       # - binning sums photosite charge before quantization, giving real SNR
+       # gain per pixel rather than a digital downscale of the full-res frame.
+       # --denoise cdn_hq (rather than cdn_off) enables the ISP's colour-denoise
+       # block - this is chrominance-only (it's the same setting rpicam-still's
+       # "auto" mode already picks for stills) so it doesn't touch luminance/
+       # spatial detail (i.e. star point sources), but it does suppress the
+       # single-pixel colour anomalies from hot/stuck photosites that a long
+       # night exposure (tens of seconds) at fixed high gain amplifies into
+       # visible red dots. cdn_hq's throughput cost is irrelevant here since
+       # this is a single still capture, not video/preview. Placed last so
+       # these always win over any conflicting flag in additional_night_params.
+       command += " --mode 2028:1520:12 --denoise cdn_hq --sharpness 0 --contrast 1.0 "
     else:
        command += additional_day_params
 
