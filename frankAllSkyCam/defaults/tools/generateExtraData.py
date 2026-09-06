@@ -24,6 +24,7 @@ import time
 import urllib.request
 from configparser import ConfigParser
 from ftplib import FTP
+from frankAllSkyCam import __version__
 
 basePath = os.path.expanduser("~") + "/frankAllSkyCam/"
 scriptDir = os.path.dirname(os.path.realpath(__file__))
@@ -455,6 +456,10 @@ def getData():
     dewPoint = None
     intTemp = float(Ta) if Ta else None
     checkAndSwitchDewHeater(intTemp, dewPoint)
+
+    # last line on purpose - delete it if you don't want the running
+    # version watermarked on the image, without touching anything above
+    myString += "\nv" + __version__
 
     print("########################")
     print("String to be displayed:")
