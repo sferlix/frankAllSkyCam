@@ -174,9 +174,6 @@ def main():
     data["clouds"] = 0
 
     calculateEphem.printData(data)
-    #max exposure (esp_secs from config.txt) wins over the calculated exposure
-    if exposure > esp_secs:
-       exposure = esp_secs
 
 
     jpg_file_name = fileManager.getOutputFileName(outputFolder, x) + data["suffisso"] + ".jpg"
@@ -322,10 +319,17 @@ def calculateExposure(sq):
                                        seed_exposure_secs=ae_seed_exposure_secs)
 
    ex = auto_ex if exposure_mode == "auto_exposure" else sqm_based_ex
+   # esp_secs (config.txt) caps the exposure actually used - applied here,
+   # before logging/returning, so "applied_secs" in exposure_compare.csv and
+   # the caller's data["exposure"] (shown on the watermark) both reflect what
+   # --shutter actually receives, not the model's raw uncapped prediction.
+   # sqm_based_ex/auto_ex stay uncapped above - they're a comparison of the
+   # two models' raw output, not what got applied.
+   applied_ex = min(ex, esp_secs)
 
-   logExposureComparison(sq, sqm_based_ex, auto_ex, ex)
+   logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex)
 
-   return ex
+   return applied_ex
 
 def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex):
    csv_path = logFolder + "/exposure_compare.csv"

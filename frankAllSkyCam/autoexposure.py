@@ -15,14 +15,21 @@
 import os
 import json
 import cv2
+from configparser import ConfigParser
 
-from frankAllSkyCam import starscalc
+from frankAllSkyCam import starscalc, fileManager
 
 STATE_FILENAME = "autoexposure_state.json"
 
+# sqmreader.py/config.txt both call this the (user-configurable) [sqm]
+# sqmFolder key - default "sqm" matches what was previously hardcoded here.
+_config = ConfigParser()
+_config.read(fileManager.getConfigFileName())
+SQM_FOLDER = _config.get('sqm', 'sqmFolder', fallback='sqm')
+
 
 def _state_path(appPath):
-    return os.path.join(appPath, "sqm", STATE_FILENAME)
+    return os.path.join(appPath, SQM_FOLDER, STATE_FILENAME)
 
 
 def recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=70):

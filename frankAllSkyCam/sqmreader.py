@@ -188,11 +188,17 @@ def takePicture(secs):
      os.system(comando)
 
      print("taking temp.jpg....")
-     exists = False
-     while exists:
+     # was "while exists:" with exists starting False - the wait never ran,
+     # relying entirely on os.system() above already blocking until
+     # libcamera-still exits. Fixed to actually wait (bounded, so a capture
+     # that never produces a file doesn't hang forever instead of raising a
+     # clear error in calculateRMS()).
+     exists = os.path.exists(image_file)
+     waited = 0.0
+     while not exists and waited < 5:
            sleep(0.5)
-           if os.path.exists(image_file):
-              exists = True
+           waited += 0.5
+           exists = os.path.exists(image_file)
 
      return image_file
 
