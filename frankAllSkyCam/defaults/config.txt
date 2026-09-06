@@ -48,7 +48,7 @@ picture_rotation = 0
 # suppress/crush, while cdn_hq's colour-only denoise removes red/purple hot-
 # pixel speckle from long exposures) - don't set --denoise or --contrast here
 # for night, they will be overridden.
-additional_night_params = --gain 14 --awbgains 2.7,1.5
+additional_night_params = --gain 10 --awbgains 2.7,1.5
 additional_day_params = --metering average
 
 
