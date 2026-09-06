@@ -34,6 +34,8 @@ picture_rotation = str(config['resolution']['picture_rotation'])
 additional_night_params = str(config['libcamera']['additional_night_params'])
 additional_day_params = str(config['libcamera']['additional_day_params'])
 night_mode = str(config['libcamera'].get('night_mode', '')).strip()
+night_sharpness = str(config['libcamera'].get('night_sharpness', '0')).strip()
+night_contrast = str(config['libcamera'].get('night_contrast', '1.0')).strip()
 
 font_size   = int(config['font']['font_size'])
 font_colorR = int(config['font']['font_colorR'])
@@ -184,29 +186,34 @@ def main():
        exposure = exposure * 1000000
        command +=" --shutter " + str(int(exposure)) + " "
        command += additional_night_params
-       # fixed at night regardless of additional_night_params: the ISP's default
-       # sharpen/contrast are tuned for daylight video and actively work
-       # against faint point sources (contrast stretch crushes a 1-2px star
-       # toward black). --denoise cdn_hq (rather than cdn_off) enables the
-       # ISP's colour-denoise block - this is chrominance-only (it's the same
-       # setting rpicam-still's "auto" mode already picks for stills) so it
-       # doesn't touch luminance/spatial detail (i.e. star point sources), but
-       # it does suppress single-pixel colour anomalies from hot/stuck
+       # --denoise cdn_hq (rather than cdn_off) enables the ISP's colour-
+       # denoise block - this is chrominance-only (it's the same setting
+       # rpicam-still's "auto" mode already picks for stills) so it doesn't
+       # touch luminance/spatial detail (i.e. star point sources), but it
+       # does suppress single-pixel colour anomalies from hot/stuck
        # photosites. cdn_hq's throughput cost is irrelevant here since this is
-       # a single still capture, not video/preview. Placed last so these
-       # always win over any conflicting flag in additional_night_params.
+       # a single still capture, not video/preview. Fixed regardless of
+       # additional_night_params - always wins over any conflicting --denoise
+       # there.
        #
-       # night_mode (config [libcamera]) optionally pins a specific sensor
-       # readout mode, e.g. "2028:1520:12" for the imx477's true 2x2-binned
-       # full-FOV mode (sums photosite charge pre-quantization - real SNR
-       # gain for faint stars, but also concentrates a single hot photosite's
-       # signal into one binned pixel before the ISP's per-pixel defect
-       # correction ever sees it, at fixed high gain/long exposure). Left
-       # empty by default: libcamera then picks a mode itself, same as before
-       # this was pinned.
+       # night_mode/night_sharpness/night_contrast (config [libcamera]) are
+       # tunable rather than hardcoded, each defaulting to the value already
+       # in production so this is a no-op until explicitly changed:
+       # - night_mode: pin a sensor readout mode, e.g. "2028:1520:12" for the
+       #   imx477's true 2x2-binned full-FOV mode (real SNR gain for faint
+       #   stars, but a hot photosite's signal is concentrated into one
+       #   binned pixel before the ISP's defect correction sees it). Empty by
+       #   default - libcamera picks a mode itself.
+       # - night_sharpness/night_contrast: the ISP's daylight-tuned defaults
+       #   were assumed to crush faint stars, so both were pinned down
+       #   (sharpness 0, contrast 1.0) - untested against real captures.
+       #   A known-good pre-regression capture on this same camera used
+       #   contrast 2.5 (the ISP default, unset) with visibly fewer hot-pixel
+       #   artifacts, so that assumption needs to be re-tested; defaults here
+       #   keep the current (unverified) values unless overridden.
        if night_mode:
           command += " --mode " + night_mode
-       command += " --denoise cdn_hq --sharpness 0 --contrast 1.0 "
+       command += " --denoise cdn_hq --sharpness " + night_sharpness + " --contrast " + night_contrast + " "
     else:
        command += additional_day_params
 

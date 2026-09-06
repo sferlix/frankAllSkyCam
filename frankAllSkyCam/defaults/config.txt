@@ -42,12 +42,11 @@ picture_rotation = 0
 # may personalize the libcamara params.
 # please DO NOT set --shutter, --immediate
 # night parameters will be used only when exposure > 0
-# NOTE: --denoise cdn_hq, --sharpness 0 and --contrast 1.0 are applied by
-# frankAllSkyCam at night regardless of what's set here (they preserve faint
-# stars that the ISP's default daylight-tuned processing would otherwise
-# suppress/crush, while cdn_hq's colour-only denoise removes red/purple hot-
-# pixel speckle from long exposures) - don't set --denoise or --contrast here
-# for night, they will be overridden.
+# NOTE: --denoise cdn_hq is applied by frankAllSkyCam at night regardless of
+# what's set here (chrominance-only colour denoise, removes red/purple hot-
+# pixel speckle from long exposures) - don't set --denoise here for night,
+# it will be overridden. --sharpness/--contrast at night come from
+# night_sharpness/night_contrast below, not from here.
 additional_night_params = --gain 10 --awbgains 2.7,1.5
 additional_day_params = --metering average
 
@@ -57,6 +56,15 @@ additional_day_params = --metering average
 # photosite's signal into one binned pixel before the ISP's defect
 # correction sees it). Leave empty to let libcamera pick a mode itself.
 night_mode =
+
+# night_sharpness/night_contrast: forced at night to preserve faint stars
+# against the ISP's daylight-tuned defaults, which were assumed to crush
+# them - untested against real captures. A known-good pre-regression
+# capture used contrast 2.5 (the ISP default, i.e. no override) with
+# visibly fewer hot-pixel artifacts than contrast 1.0, so that assumption
+# is worth re-testing; change these to compare.
+night_sharpness = 0
+night_contrast = 1.0
 
 
 [timelapse]
