@@ -93,9 +93,16 @@ def getTimes():
               # rejects the whole file on invalid syntax, see below)
               if mat <= ser - 1:
                  f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
-              f.write("*/1 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
+              # night hours run every 2 min, not every 1: a night capture cycle
+              # (exposure up to esp_secs=60s, plus libcamera/SQM/watermark/FTP
+              # overhead) routinely takes well over 60s end to end - measured
+              # 119s on one production run - so a 1-min interval just queues
+              # every invocation behind the camera lock instead of ever
+              # actually running back-to-back. Daytime (above) is exposure=0
+              # (near-instant), so it keeps */1.
+              f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
               if mat >= 1:
-                 f.write("*/1 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
+                 f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1 " + MARKER + "\n")
               # generateExtraData.py lives outside the package (in ~/frankAllSkyCam/tools/,
               # user-editable, never overwritten by a package upgrade) so it's invoked by
