@@ -296,8 +296,13 @@ def readsqm(skip_pseudo=False):
    try:
 
       sq, le  = sqmreader.readSQM(skip_pseudo=skip_pseudo)
-   except:
-      print("Error while calculating SQM")
+   except Exception as e:
+      # bare "except: print(...)" (no message) used to swallow the actual
+      # error, and left sq=0 - indistinguishable from a genuine full-daytime
+      # reading, so a night-time read failure would silently be captured
+      # with additional_day_params instead of night settings. Surfacing the
+      # real exception at least makes that failure diagnosable in cron logs.
+      print("ERROR while calculating SQM: " + str(e))
    print("sqm = " + str(sq))
    print("sqm_le = " + str(le))
    return sq, le

@@ -452,6 +452,7 @@ def getData():
     # available above - wire in whatever this installation actually has.
     # e.g. with the WS90 station and a Shelly1V3 providing internal temp:
     # dewPoint = meteoSensors.get("dewpoint", {}).get("value")
+    dewPoint = None
     intTemp = float(Ta) if Ta else None
     checkAndSwitchDewHeater(intTemp, dewPoint)
 

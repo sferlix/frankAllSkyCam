@@ -78,9 +78,15 @@ def getTimes():
               for element in linesToAdd:
                   f.write(element)
 
-              f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              # mat/ser split the day into 3 hour ranges below - guard the
+              # edges (mat==0, or mat>ser-1) so an extreme-latitude dawn/dusk
+              # time can't render an invalid range like "0--1" (crontab
+              # rejects the whole file on invalid syntax, see below)
+              if mat <= ser - 1:
+                 f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
               f.write("*/1 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
-              f.write("*/1 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
+              if mat >= 1:
+                 f.write("*/1 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1\n")
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1\n")
               # generateExtraData.py lives outside the package (in ~/frankAllSkyCam/tools/,
               # user-editable, never overwritten by a package upgrade) so it's invoked by
@@ -95,7 +101,13 @@ def getTimes():
               f.write("0 0 1 1 * python3 -m frankAllSkyCam.crontab >" + logFolder + "/crontab.log 2>&1\n")
               f.close()
 
-              os.system("crontab -r")
+              # crontab <file> already atomically replaces the whole crontab
+              # in one step - it was preceded by "crontab -r" (clear first),
+              # which left a window where a syntax error in the new file
+              # (crontab refuses the whole file, doesn't apply partially)
+              # would leave the box with zero cron jobs instead of the old
+              # ones. Just installing the new file directly means a bad file
+              # fails safe, leaving the previous crontab in place.
               os.system("crontab ./AllSkyCrontab.txt")
               os.system("rm ./AllSkyCrontab.txt")
 

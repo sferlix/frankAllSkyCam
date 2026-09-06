@@ -6,6 +6,7 @@ import ftplib
 import datetime
 import time
 import os
+import sys
 from os import path
 #from frankAllSkyCam import calculateEphem
 
