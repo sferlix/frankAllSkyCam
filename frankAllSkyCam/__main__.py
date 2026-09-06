@@ -156,7 +156,15 @@ def main():
        return
 
     data = calculateEphem.calculate(x)
-    sqm, sqm_le = readsqm()
+    # full daytime (sun above horizon, isTimelapse False) never needs the
+    # camera-based pseudo-SQM fallback: calculateExposure() always returns 0
+    # regardless of sqm during the day, so estimating sky brightness via
+    # camera test shots (getPseudoSQM -> takePicture) would only waste time.
+    # A real SQM-LE hardware reading (cheap network call) still runs and still
+    # gets logged during the day either way - only the pseudo fallback is
+    # skipped, so a debug log row that would have carried a computed cSQM
+    # comparison now carries 0 for that column during the day instead.
+    sqm, sqm_le = readsqm(skip_pseudo=not data["isTimelapse"])
     exposure = calculateExposure(sqm)
 
     data["sqm"] = sqm
@@ -281,13 +289,13 @@ def main():
     print("AllSkyCam is done.")
     return
 
-def readsqm():
+def readsqm(skip_pseudo=False):
 
    sq=0
    le =""
    try:
 
-      sq, le  = sqmreader.readSQM()
+      sq, le  = sqmreader.readSQM(skip_pseudo=skip_pseudo)
    except:
       print("Error while calculating SQM")
    print("sqm = " + str(sq))

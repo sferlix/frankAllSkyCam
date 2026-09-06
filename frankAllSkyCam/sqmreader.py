@@ -88,7 +88,7 @@ def main():
     return sqm, str(SQM_LE)
 
 
-def readSQM():
+def readSQM(skip_pseudo=False):
     s = 0
     sqm = 0
     ret = 0
@@ -102,7 +102,14 @@ def readSQM():
        if sqm < 0:
           sqm_le = "n"
 
-    if SQM_DEBUG=="y" or sqm_le=="n":
+    # getPseudoSQM() takes real camera test shots (takePicture, up to a 5s
+    # exposure) to estimate sky brightness - worth it at night/twilight, but
+    # pure waste in full daylight, where the exposure decision downstream
+    # ignores sqm entirely regardless of its value. skip_pseudo (set by the
+    # caller from sun position) short-circuits just this fallback; a real
+    # SQM-LE hardware reading above (cheap network call) is unaffected either
+    # way, so its own daytime logging keeps working undisturbed.
+    if not skip_pseudo and (SQM_DEBUG=="y" or sqm_le=="n"):
        if sqm_le == "n":
           print("Problem with SQM_LE. Switching to PseudoSQM")
        print("Calculated SQM:")
