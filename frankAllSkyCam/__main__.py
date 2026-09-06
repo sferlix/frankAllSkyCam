@@ -33,6 +33,7 @@ picture_rotation = str(config['resolution']['picture_rotation'])
 
 additional_night_params = str(config['libcamera']['additional_night_params'])
 additional_day_params = str(config['libcamera']['additional_day_params'])
+night_mode = str(config['libcamera'].get('night_mode', '')).strip()
 
 font_size   = int(config['font']['font_size'])
 font_colorR = int(config['font']['font_colorR'])
@@ -186,20 +187,26 @@ def main():
        # fixed at night regardless of additional_night_params: the ISP's default
        # sharpen/contrast are tuned for daylight video and actively work
        # against faint point sources (contrast stretch crushes a 1-2px star
-       # toward black). --mode pins the sensor's true 2x2-binned full-FOV
-       # readout (imx477: 2028x1520) instead of letting libcamera guess a mode
-       # - binning sums photosite charge before quantization, giving real SNR
-       # gain per pixel rather than a digital downscale of the full-res frame.
-       # --denoise cdn_hq (rather than cdn_off) enables the ISP's colour-denoise
-       # block - this is chrominance-only (it's the same setting rpicam-still's
-       # "auto" mode already picks for stills) so it doesn't touch luminance/
-       # spatial detail (i.e. star point sources), but it does suppress the
-       # single-pixel colour anomalies from hot/stuck photosites that a long
-       # night exposure (tens of seconds) at fixed high gain amplifies into
-       # visible red dots. cdn_hq's throughput cost is irrelevant here since
-       # this is a single still capture, not video/preview. Placed last so
-       # these always win over any conflicting flag in additional_night_params.
-       command += " --mode 2028:1520:12 --denoise cdn_hq --sharpness 0 --contrast 1.0 "
+       # toward black). --denoise cdn_hq (rather than cdn_off) enables the
+       # ISP's colour-denoise block - this is chrominance-only (it's the same
+       # setting rpicam-still's "auto" mode already picks for stills) so it
+       # doesn't touch luminance/spatial detail (i.e. star point sources), but
+       # it does suppress single-pixel colour anomalies from hot/stuck
+       # photosites. cdn_hq's throughput cost is irrelevant here since this is
+       # a single still capture, not video/preview. Placed last so these
+       # always win over any conflicting flag in additional_night_params.
+       #
+       # night_mode (config [libcamera]) optionally pins a specific sensor
+       # readout mode, e.g. "2028:1520:12" for the imx477's true 2x2-binned
+       # full-FOV mode (sums photosite charge pre-quantization - real SNR
+       # gain for faint stars, but also concentrates a single hot photosite's
+       # signal into one binned pixel before the ISP's per-pixel defect
+       # correction ever sees it, at fixed high gain/long exposure). Left
+       # empty by default: libcamera then picks a mode itself, same as before
+       # this was pinned.
+       if night_mode:
+          command += " --mode " + night_mode
+       command += " --denoise cdn_hq --sharpness 0 --contrast 1.0 "
     else:
        command += additional_day_params
 

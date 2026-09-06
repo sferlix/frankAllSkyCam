@@ -51,6 +51,13 @@ picture_rotation = 0
 additional_night_params = --gain 10 --awbgains 2.7,1.5
 additional_day_params = --metering average
 
+# night_mode: optional sensor readout mode pinned for night captures only,
+# e.g. "2028:1520:12" for the imx477's true 2x2-binned full-FOV mode
+# (real SNR gain for faint stars, but also concentrates a single hot
+# photosite's signal into one binned pixel before the ISP's defect
+# correction sees it). Leave empty to let libcamera pick a mode itself.
+night_mode =
+
 
 [timelapse]
 # if True, timelapse from sunset to sunrise will be generated  Otherwise, not.
