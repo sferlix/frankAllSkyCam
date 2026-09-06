@@ -177,6 +177,13 @@ def main():
 
 def _run():
 
+    # createAppFolders() (fileManager.getConfigFileName, called at module
+    # import time above) only provisions this on a fresh install - existing
+    # installs upgrading to a version that adds a new folder never get it
+    # created that way, so it's ensured here too, on every run, since
+    # darksubtract.applyToFile()/capturedarks.py both need it to exist.
+    fileManager.createPath(appPath + "darks")
+
     cameraLock = _acquireCameraLock()
     if cameraLock is None:
        print("Skipping this cycle - camera unavailable.")

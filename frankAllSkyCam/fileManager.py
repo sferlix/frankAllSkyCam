@@ -115,6 +115,7 @@ def createAppFolders():
     smqDir = createPath(homePath + "/frankAllSkyCam/sqm")
     smqDir = createPath(homePath + "/frankAllSkyCam/png")
     toolsDir = createPath(homePath + "/frankAllSkyCam/tools")
+    darksDir = createPath(homePath + "/frankAllSkyCam/darks")
     return
 
 def getOutputFileName(outputDir, today):
