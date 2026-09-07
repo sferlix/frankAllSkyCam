@@ -8,7 +8,7 @@ import ftplib
 import datetime
 import time
 import os
-from pytz import timezone
+from zoneinfo import ZoneInfo
 from os import path
 from configparser import ConfigParser
 from frankAllSkyCam import fileManager
@@ -43,7 +43,7 @@ FTP_pass = str(config['ftp']['FTP_pass'])
 FTP_uploadFolder = str(config['ftp']['FTP_uploadFolder'])
 FTP_fileNameTimelapse = str(config['ftp']['FTP_fileNameTimelapseMP4'])
 
-tz = timezone(time_zone)
+tz = ZoneInfo(time_zone)
 x = datetime.datetime.now(tz)
 
 def buildVideoFilter():

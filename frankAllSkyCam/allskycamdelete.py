@@ -6,7 +6,7 @@
 import datetime
 import os
 import shutil
-from pytz import timezone
+from zoneinfo import ZoneInfo
 from configparser import ConfigParser
 from frankAllSkyCam import fileManager
 
@@ -23,7 +23,7 @@ outputFolder = appPath + str(config['system']['otuputFolder'])
 days_retention = int(config['system']['days_retention'])
 
 def main():
-    tz = timezone(time_zone)
+    tz = ZoneInfo(time_zone)
     z = datetime.datetime.now(tz)
     cutoff = (z+datetime.timedelta(days=-days_retention)).strftime("%Y%m%d")
 

@@ -23,7 +23,7 @@ days_retention = 3
 rebootAfter = 15
 
 [site]
-# configure your site (lat / long / elevation in meters, pytz timezone)
+# configure your site (lat / long / elevation in meters, IANA timezone e.g. Europe/Rome)
 latitude = 44.75
 longitude = 9.29
 elevation = 1150

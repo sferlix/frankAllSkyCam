@@ -10,7 +10,7 @@ import fcntl
 import datetime
 from fractions import Fraction
 import time
-from pytz import timezone
+from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
 from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract
@@ -111,7 +111,7 @@ FTP_uploadFolder = str(config['ftp']['FTP_uploadFolder'])
 FTP_fileNameAllSkyImg = str(config['ftp']['FTP_fileNameAllSkyImgJPG'])
 FTP_fileName = FTP_uploadFolder + "/" + FTP_fileNameAllSkyImg
 
-tz = timezone(time_zone)
+tz = ZoneInfo(time_zone)
 x = datetime.datetime.now(tz)
 
 # camera-exclusive section is SQM measurement (its own test shots also drive

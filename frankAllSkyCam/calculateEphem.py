@@ -2,7 +2,7 @@
 
 import ephem  #pip3 install ephem
 import math   #sudo apt-get install libmagickwand-dev
-import pytz
+from zoneinfo import ZoneInfo
 import sys
 import os
 import datetime
@@ -51,8 +51,8 @@ RANGES = [x[0] for x in MOONPHASE]
 
 def calculate(dt):
    print("Input date:" + str(dt))
-   tz = pytz.timezone("utc")
-   mytz = pytz.timezone(myTimeZone)
+   tz = timezone.utc
+   mytz = ZoneInfo(myTimeZone)
    dt_utc = dt.astimezone(tz)
 
    #mySite
@@ -245,8 +245,8 @@ def calculatePlanetsVisibility(dt):
       }
  
     print("Input date:" + str(dt))
-    tz = pytz.timezone("utc")
-    mytz = pytz.timezone(myTimeZone)
+    tz = timezone.utc
+    mytz = ZoneInfo(myTimeZone)
     dt_utc = dt.astimezone(tz)
 
     mySite = ephem.Observer()

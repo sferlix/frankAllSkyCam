@@ -8,8 +8,6 @@ import time
 import traceback
 from datetime import datetime, timedelta
 from frankAllSkyCam import fileManager
-from pytz import timezone
-import pytz
 import sys
 import math
 import os
