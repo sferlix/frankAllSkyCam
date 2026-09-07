@@ -114,7 +114,7 @@ DAY_NRBR_CLOUD = 0.12            # calibrated white/gray NRBR (measured on Sun-f
                                   # R roughly equal to B)
 
 
-def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None):
+def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False):
     """
     Analizza il cielo notturno per contare le stelle e stimare la copertura nuvolosa.
 
@@ -125,7 +125,12 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     - min_contrasto: soglia minima di intensita' per distinguere una stella dal rumore
     - exposure_secs: durata di esposizione applicata (se nota); migliora la stima
       delle nuvole. Se omesso, si tenta l'EXIF del file e infine un fallback
-      basato solo su luminosita'/texture.
+      basato solo su luminosita'/texture. Ignorato se twilight_isp_mode=True.
+    - twilight_isp_mode: True se lo scatto e' stato esposto dall'ISP (twilight
+      handoff) anziche' con uno shutter fisso/predetto - in tal caso la
+      luminosita' e' normalizzata dall'ISP stesso e non e' informativa per le
+      nuvole (stesso motivo per cui il branch diurno usa NRBR invece della
+      luminosita'), quindi la copertura nuvolosa usa NRBR anche di notte.
 
     OUTPUT:
     - star_count: numero di stelle rilevate
@@ -156,7 +161,10 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     sky_eroded = _erode_guard_band(sky)
 
     star_count = _find_stars(gray, sky_eroded, min_contrasto, sensibilita)
-    cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs)
+    if twilight_isp_mode:
+        cloud_cover = _estimate_cloud_cover_nrbr(img, sky_eroded)
+    else:
+        cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs)
 
     print("end of starscalc. Stars =" + str(star_count) + ", clouds = " + str(cloud_cover) +
           "%" + (" (moon in frame)" if source_found else ""))
@@ -176,15 +184,28 @@ def _analyze_day(img, gray, roi):
 
     sky_eroded = _erode_guard_band(sky)
 
-    b, _, r = cv2.split(img.astype(np.float64))
-    nrbr = (b - r) / (b + r + 1e-6)
-    sky_nrbr = nrbr[sky_eroded == 255]
-    score = np.clip((DAY_NRBR_CLEAR - sky_nrbr) / (DAY_NRBR_CLEAR - DAY_NRBR_CLOUD), 0, 1)
-    cloud_cover = round(100.0 * score.mean(), 1)
+    cloud_cover = _estimate_cloud_cover_nrbr(img, sky_eroded)
 
     print("end of starscalc (day). clouds = " + str(cloud_cover) + "%" +
           (" (sun in frame)" if sun_found else ""))
     return 0, cloud_cover
+
+
+def _estimate_cloud_cover_nrbr(img, sky_mask):
+    # Color-based (Normalized Red-Blue Ratio), not brightness-based: clear
+    # sky is strongly blue, cloud is white/gray (R roughly equal to B),
+    # regardless of exposure. Shared with the daytime branch, which needs
+    # this same exposure-independence for the same reason: both daytime and
+    # twilight_isp_mode frames are ISP auto-exposed, so brightness is
+    # normalized by the ISP's own metering and carries little information
+    # about cloud cover - unlike a night frame captured at a fixed/predicted
+    # shutter speed, where the radiance-rate heuristic in
+    # _estimate_cloud_cover applies instead.
+    b, _, r = cv2.split(img.astype(np.float64))
+    nrbr = (b - r) / (b + r + 1e-6)
+    sky_nrbr = nrbr[sky_mask == 255]
+    score = np.clip((DAY_NRBR_CLEAR - sky_nrbr) / (DAY_NRBR_CLEAR - DAY_NRBR_CLOUD), 0, 1)
+    return round(100.0 * score.mean(), 1)
 
 
 def _erode_guard_band(sky):

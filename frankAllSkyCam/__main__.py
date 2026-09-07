@@ -99,6 +99,7 @@ ae_seed_exposure_secs = config.getfloat('auto_exposure', 'seed_exposure_secs', f
 # twilight-handoff/saturation-guard settings - see autoexposure.py module
 # docstring for why the crossover test replaces a fixed sun-altitude band.
 ae_twilight_guard_deg = config.getfloat('auto_exposure', 'twilight_guard_deg', fallback=3.0)
+ae_twilight_ev_bias = config.getfloat('auto_exposure', 'twilight_ev_bias', fallback=0.3)
 ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
 ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
 use_sqm_le = config['sqm']['use_sqm_le']
@@ -288,6 +289,13 @@ def _run():
           except OSError:
              pass
           command += " --metadata " + ISP_METADATA_PATH + " --metadata-format json "
+          # --metering average factors in the large near-black margin outside
+          # the fisheye circle (and, at twilight, an already-darker sky than
+          # full daytime), pulling the ISP's own target down - a small,
+          # twilight-only EV bias nudges it back up without touching the
+          # (unaffected, not reported as wrong) full daytime exposure.
+          if ae_twilight_ev_bias:
+             command += " --ev " + str(ae_twilight_ev_bias)
 
     try:
        #launch the command line
@@ -343,7 +351,7 @@ def _run():
        # for exposure-normalized cloud detection
        cloud_exposure_secs = exposure_secs if exposure_secs is not None else harvested_exposure_secs
        print("calculating stars on: " + jpg_file_name)
-       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs)
+       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs, twilight_isp_mode=twilight_isp_mode)
        data["stars"] = sst
        data["clouds"] = scl
 
