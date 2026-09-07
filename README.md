@@ -54,11 +54,13 @@ Install ImageMagick's development headers (needed to render the moon-phase image
 sudo apt install libmagickwand-dev
 ```
 
-frankAllSkyCam uses **libcamera** (bundled with current Raspberry Pi OS). The older `raspistill` is not supported. Check libcamera works before going further:
+frankAllSkyCam uses **libcamera** (bundled with current Raspberry Pi OS). The older `raspistill` is not supported. Check the camera works before going further:
 
 ```
-libcamera-jpeg -o test.jpg --immediate -n
+rpicam-jpeg -o test.jpg --immediate -n
 ```
+
+On an older Raspberry Pi OS release still using the pre-rename `libcamera-apps` package, use `libcamera-jpeg` instead - frankAllSkyCam itself auto-detects whichever one (`rpicam-still` or `libcamera-still`) is actually installed, so either OS release works without any configuration.
 
 You should see it capture and leave a `test.jpg` in the current folder.
 
@@ -209,7 +211,7 @@ Exposure duration is predicted from SQM via a small polynomial model, trained fr
 
 Add or adjust pairs to retune the curve for your own site/camera/gain settings - the software interpolates (degree-3 polynomial regression) between the values you provide. The `esp_secs` parameter in `config.txt` always caps the maximum exposure regardless of what the model predicts.
 
-You can also fully customize the `libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, anything `libcamera-still` accepts (just don't set `--shutter`, `--immediate`, `--mode`, `--denoise`, `--sharpness` or `--contrast` there - those are fixed by frankAllSkyCam at night, since the ISP's daylight-tuned defaults for denoise/sharpen/contrast actively suppress faint stars, and `--mode` pins a true 2x2-binned, full-FOV sensor readout for better low-light sensitivity per pixel - not just a wider `--gain`).
+You can also fully customize the `rpicam-still`/`libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, anything it accepts (just don't set `--shutter`, `--immediate`, `--mode`, `--denoise`, `--sharpness` or `--contrast` there - those are fixed by frankAllSkyCam at night, since the ISP's daylight-tuned defaults for denoise/sharpen/contrast actively suppress faint stars, and `--mode` pins a true 2x2-binned, full-FOV sensor readout for better low-light sensitivity per pixel - not just a wider `--gain`).
 
 ### Alternative exposure strategy: auto_exposure
 

@@ -52,7 +52,7 @@ def main():
 
     for exp in EXPOSURES_SECS:
         out_path = os.path.join(darks_dir, darksubtract.darkFilename(exp))
-        command = "libcamera-still -n -o " + out_path
+        command = fileManager.getCameraBinary() + " -n -o " + out_path
         command += " --width " + horiz + " --height " + vert
         command += " --immediate --encoding png"
         command += " --shutter " + str(int(exp * 1000000)) + " "

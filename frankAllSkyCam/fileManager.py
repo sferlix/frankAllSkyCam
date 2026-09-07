@@ -7,8 +7,18 @@ import datetime
 import time
 import os
 import sys
+import shutil
 from os import path
 #from frankAllSkyCam import calculateEphem
+
+def getCameraBinary():
+   # Raspberry Pi renamed libcamera-apps to rpicam-apps; a sufficiently
+   # fresh Raspberry Pi OS image ships only rpicam-still, with no
+   # libcamera-still compatibility alias at all. Prefer the current name,
+   # fall back to the old one for installs that predate the rename.
+   if shutil.which("rpicam-still"):
+      return "rpicam-still"
+   return "libcamera-still"
 
 def saveToFTP(isFTP,nomefile,FTP_server,FTP_login,FTP_pass,FTP_fileName):
    if not isFTP:

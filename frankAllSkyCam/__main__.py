@@ -137,8 +137,8 @@ def _acquireCameraLock():
           return fd
        except BlockingIOError:
           if waited >= CAMERA_LOCK_MAX_WAIT_SECS:
-             print("WARNING: camera busy for " + str(waited) + "s - assuming the other run is stuck, killing libcamera")
-             os.system("ps -ef|grep libcamera | grep -v color|awk '{print $2}'|xargs kill -9 1> /dev/null 2>&1")
+             print("WARNING: camera busy for " + str(waited) + "s - assuming the other run is stuck, killing the capture process")
+             os.system("ps -ef|grep -E 'libcamera-still|rpicam-still' | grep -v color|awk '{print $2}'|xargs kill -9 1> /dev/null 2>&1")
              time.sleep(1)
              try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -238,7 +238,7 @@ def _run():
     jpg_file_name = fileManager.getOutputFileName(outputFolder, x) + data["suffisso"] + ".jpg"
     print("executing capture:")
 
-    command = "libcamera-still -n -o " + jpg_file_name
+    command = fileManager.getCameraBinary() + " -n -o " + jpg_file_name
     command += " --width " + str(horiz)
     command += " --height "+ str(vert)
     command += " --immediate "
