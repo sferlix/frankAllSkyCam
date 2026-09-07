@@ -203,10 +203,35 @@ target_mean = 30
 # dark obstructions (roofline, trees) near the edges from skewing the mean.
 # 100 = full image width, 70 = circle whose diameter is 70% of image width.
 roi_percent = 70
-# floor so the feedback loop can't collapse exposure toward zero
+# floor so the feedback loop can't collapse exposure toward zero. During
+# twilight (dusk and dawn) frankAllSkyCam no longer forces this floor the
+# instant the sun crosses the horizon - see twilight_guard_deg below.
 min_exposure_secs = 1
 # used only for the very first run, before any state file exists yet
 seed_exposure_secs = 5
+
+# twilight handoff: while the sun is below the horizon but the algorithm's
+# own honest prediction is still under min_exposure_secs above, the sky
+# isn't dark enough yet for a floored fixed shutter to be meaningful -
+# libcamera's own auto-exposure drives capture instead (same as daytime)
+# until the real sky catches up. This sizing is automatic (reacts to the
+# actual measured sky, clear or overcast, not a fixed clock), NOT
+# controlled by the value below.
+# twilight_guard_deg is only a cold-start safety strip: for this many
+# degrees below the horizon, always let the ISP drive regardless of
+# leftover state from many hours earlier (e.g. this morning's dawn) -
+# it is not what sizes the handoff.
+twilight_guard_deg = 3
+# saturation guard: if the previous frame came back with at least this
+# fraction of its ROI pixels clipped (e.g. a cloud reflecting light
+# pollution at night), a clipped mean can't say how far over it really
+# was, so the next exposure is cut harder than the plain ratio would -
+# see saturation_severity_gain below. A single bright point source (Moon,
+# a planet) alone stays well under this on real captures.
+saturation_clip_frac_threshold = 0.05
+# how much harder to cut when the clip-fraction guard above fires -
+# severity = 1 + clip_frac * this value
+saturation_severity_gain = 8
 
 [ftp]
 # if True, allSkyCam image, timelapse and startrails

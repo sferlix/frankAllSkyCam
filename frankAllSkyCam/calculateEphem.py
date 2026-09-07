@@ -135,6 +135,7 @@ def calculate(dt):
       "data": dt.strftime("%d/%m/%y"),
       "ora": dt.astimezone(mytz).strftime("%H:%M"),
       "isTimelapse": (sf == "YTL" or sf == "NTL"),
+      "sunAlt": sunAlt,
       "suffisso": sf,
       "moonRise": mr,
       "moonSet": ms,

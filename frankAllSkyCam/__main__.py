@@ -96,6 +96,11 @@ ae_target_mean = config.getfloat('auto_exposure', 'target_mean', fallback=30.0)
 ae_roi_percent = config.getfloat('auto_exposure', 'roi_percent', fallback=70.0)
 ae_min_exposure_secs = config.getfloat('auto_exposure', 'min_exposure_secs', fallback=1.0)
 ae_seed_exposure_secs = config.getfloat('auto_exposure', 'seed_exposure_secs', fallback=5.0)
+# twilight-handoff/saturation-guard settings - see autoexposure.py module
+# docstring for why the crossover test replaces a fixed sun-altitude band.
+ae_twilight_guard_deg = config.getfloat('auto_exposure', 'twilight_guard_deg', fallback=3.0)
+ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
+ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
 use_sqm_le = config['sqm']['use_sqm_le']
 
 isFTP = str(config['ftp']['isFTP'])=='True'
@@ -116,6 +121,11 @@ x = datetime.datetime.now(tz)
 CAMERA_LOCK_PATH = logFolder + "/camera.lock"
 CAMERA_LOCK_RETRY_SECS = 5
 CAMERA_LOCK_MAX_WAIT_SECS = 90  # past this, assume the other run is stuck, not just slow
+
+# twilight-handoff ISP metadata sidecar (see autoexposure.record_isp_exposure)
+# - overwritten every run, not per-capture-unique, same convention as
+# sqmreader.py's own fixed sqm_temp.jpg path.
+ISP_METADATA_PATH = logFolder + "/isp_metadata.json"
 
 def _acquireCameraLock():
     fileManager.createPath(logFolder)
@@ -195,7 +205,26 @@ def _run():
     # pseudo-SQM - calculateExposure() always returns 0 regardless of sqm
     # during the day, so there is nothing for a reading to drive.
     sqm, sqm_le = readsqm(daytime=not data["isTimelapse"])
-    exposure = calculateExposure(sqm)
+
+    # twilight handoff (dusk and dawn share this test, no direction flag):
+    # while the sun is below the horizon but the feedback loop's own honest
+    # prediction is still under min_exposure_secs, the sky isn't dark enough
+    # yet for a floored fixed shutter to be meaningful - let the ISP's own
+    # auto-exposure keep driving capture instead (see autoexposure.py).
+    # twilight_guard_deg is only a cold-start guard against stale state
+    # right at the horizon crossing, not the thing sizing the handoff.
+    sun_alt = data["sunAlt"]
+    twilight_isp_mode = False
+    if exposure_mode == "auto_exposure" and sun_alt < 0:
+       if sun_alt >= -ae_twilight_guard_deg:
+          twilight_isp_mode = True
+       else:
+          twilight_isp_mode = autoexposure.should_use_isp(
+             appPath, ae_target_mean, ae_min_exposure_secs,
+             saturation_clip_frac_threshold=ae_saturation_clip_frac_threshold,
+             saturation_severity_gain=ae_saturation_severity_gain)
+
+    exposure = calculateExposure(sqm, twilight_isp_mode)
 
     data["sqm"] = sqm
     data["exposure"] = exposure
@@ -247,6 +276,18 @@ def _run():
        command += " --denoise cdn_hq --sharpness " + night_sharpness + " --contrast " + night_contrast + " "
     else:
        command += additional_day_params
+       if twilight_isp_mode:
+          # let the ISP auto-expose this twilight frame (same as full
+          # daytime) and harvest what it actually chose back via metadata,
+          # to warm the feedback loop for when it does take over.
+          # ISP_METADATA_PATH is a fixed, overwritten-every-run path - if
+          # this capture fails/is killed before writing it, a stale file
+          # from a previous run must not be read back as if it were fresh.
+          try:
+             os.remove(ISP_METADATA_PATH)
+          except OSError:
+             pass
+          command += " --metadata " + ISP_METADATA_PATH + " --metadata-format json "
 
     try:
        #launch the command line
@@ -269,6 +310,17 @@ def _run():
 
        exposure_secs = exposure / 1000000.0 if exposure > 0 else None
 
+       # twilight-handoff frame: the ISP drove this capture, so harvest
+       # what it actually chose (real exposure, not the algorithm's guess)
+       # to warm the feedback loop, and use that real value for cloud
+       # detection below instead of leaving exposure_secs unknown.
+       harvested_exposure_secs = None
+       if twilight_isp_mode:
+          harvested_exposure_secs = autoexposure.record_isp_exposure(
+             ISP_METADATA_PATH, jpg_file_name, appPath, roi_percent=ae_roi_percent)
+          if harvested_exposure_secs is not None:
+             data["exposure"] = harvested_exposure_secs
+
        if exposure_secs is not None:
           # dark frame subtraction (see darksubtract.py) is the primary
           # correction - no-op unless appPath/darks/manifest.json exists
@@ -285,9 +337,13 @@ def _run():
                                            night_sharpness, night_contrast):
              hotpixels.applyToFile(jpg_file_name, appPath)
 
-       # calculate stars (night) and clouds (day or night)
+       # calculate stars (night) and clouds (day or night) - a twilight-
+       # handoff frame has no exposure_secs (no --shutter was used) but
+       # does have the ISP's harvested real value, which is just as good
+       # for exposure-normalized cloud detection
+       cloud_exposure_secs = exposure_secs if exposure_secs is not None else harvested_exposure_secs
        print("calculating stars on: " + jpg_file_name)
-       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=exposure_secs)
+       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs)
        data["stars"] = sst
        data["clouds"] = scl
 
@@ -360,19 +416,33 @@ def readsqm(daytime=False):
    print("sqm_le = " + str(le))
    return sq, le
 
-def calculateExposure(sq):
-   if sq < 9:
+def calculateExposure(sq, twilight_isp_mode=False):
+   if sq < 9 and not twilight_isp_mode:
       # no need to change the exposure.
       return 0
 
    # compute both predictions every time (the inactive one is cheap: pure
    # sqm math, or a JSON state-file read) so exposure_compare.csv always has
-   # both sides for comparison, whichever mode is actually driving capture.
+   # both sides for comparison, whichever mode is actually driving capture -
+   # including during twilight_isp_mode, where auto_ex shows what the old
+   # floored behavior would have forced (e.g. reads 1.0 where the bug used
+   # to force it), for validating the fix on real nights. Computed even
+   # when sq<9 here so a bright-twilight reading doesn't leave a silent gap
+   # in the CSV right where the fix needs to be checked.
    sqm_based_ex = exposurecalc.getExposure(sq, esp_secs=esp_secs, appPath=appPath)
    auto_ex = autoexposure.getExposure(sq, esp_secs=esp_secs, appPath=appPath,
                                        target_mean=ae_target_mean,
                                        min_exposure_secs=ae_min_exposure_secs,
-                                       seed_exposure_secs=ae_seed_exposure_secs)
+                                       seed_exposure_secs=ae_seed_exposure_secs,
+                                       saturation_clip_frac_threshold=ae_saturation_clip_frac_threshold,
+                                       saturation_severity_gain=ae_saturation_severity_gain)
+
+   if sq < 9:
+      # twilight_isp_mode only (see guard above) - sq<9 still means "no
+      # need to change exposure" for capture purposes, applied_ex stays 0,
+      # but the comparison row above is worth keeping.
+      logExposureComparison(sq, sqm_based_ex, auto_ex, 0, twilight_isp_mode)
+      return 0
 
    ex = auto_ex if exposure_mode == "auto_exposure" else sqm_based_ex
    # esp_secs (config.txt) caps the exposure actually used - applied here,
@@ -380,22 +450,25 @@ def calculateExposure(sq):
    # the caller's data["exposure"] (shown on the watermark) both reflect what
    # --shutter actually receives, not the model's raw uncapped prediction.
    # sqm_based_ex/auto_ex stay uncapped above - they're a comparison of the
-   # two models' raw output, not what got applied.
-   applied_ex = min(ex, esp_secs)
+   # two models' raw output, not what got applied. During twilight_isp_mode
+   # the ISP drives capture instead (see _run()), so applied_ex is 0 the
+   # same way full daytime's is - it's not what --shutter would have used.
+   applied_ex = 0 if twilight_isp_mode else min(ex, esp_secs)
 
-   logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex)
+   logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode)
 
    return applied_ex
 
-def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex):
+def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode=False):
    csv_path = logFolder + "/exposure_compare.csv"
    file_exists = os.path.exists(csv_path)
+   capture_mode = "twilight_isp" if twilight_isp_mode else exposure_mode
    try:
       with open(csv_path, "a", newline="") as f:
          writer = csv.writer(f)
          if not file_exists:
-            writer.writerow(["timestamp", "sqm", "exposure_mode", "sqm_based_secs", "auto_exposure_secs", "applied_secs"])
-         writer.writerow([datetime.datetime.now(tz).isoformat(), sq, exposure_mode, sqm_based_ex, auto_ex, applied_ex])
+            writer.writerow(["timestamp", "sqm", "exposure_mode", "capture_mode", "sqm_based_secs", "auto_exposure_secs", "applied_secs"])
+         writer.writerow([datetime.datetime.now(tz).isoformat(), sq, exposure_mode, capture_mode, sqm_based_ex, auto_ex, applied_ex])
    except Exception as e:
       print("WARNING: could not write exposure_compare.csv: " + str(e))
 

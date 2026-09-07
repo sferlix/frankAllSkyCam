@@ -217,6 +217,10 @@ By default (`exposure_mode = auto_exposure` in `config.txt`'s `[exposure]` secti
 
 Note this default only applies to a fresh install - if you're upgrading an existing install, your `config.txt` keeps whatever it already has (nothing overwrites it), so add `exposure_mode = auto_exposure` under `[exposure]` yourself if you want to switch.
 
+**Twilight handoff (auto_exposure only):** `min_exposure_secs` stops the feedback loop from collapsing exposure toward zero once it's genuinely dark - but forced blindly right at sunset/sunrise, it used to produce a badly overexposed frame every dusk and dawn, before the loop had a chance to learn the sky was still twilight-bright. Now, while the sun is below the horizon but the loop's own honest prediction is still under `min_exposure_secs`, libcamera's own auto-exposure drives that capture instead (same as daytime), and its real result is harvested to keep the feedback loop warm for when it does take over - the same check applies at both dusk and dawn, sized by the sky's actual measured brightness rather than a fixed clock, so it holds up under real cloud cover too. `[auto_exposure] twilight_guard_deg` is only a cold-start safety strip near the horizon, not what sizes the handoff.
+
+**Saturation guard (auto_exposure only):** if a previous frame came back significantly clipped (a cloud reflecting light pollution at night, say), the plain brightness ratio can't tell how far over target it really was - a clipped mean looks the same whether the true overexposure was 2x or 30x. `[auto_exposure] saturation_clip_frac_threshold` / `saturation_severity_gain` control when and how much harder the next exposure gets cut in that case.
+
 ## Requirements
 
 Installed automatically via pip: `pytz`, `numpy`, `ephem`, `Wand`, `opencv-python-headless`, `Pillow`, `requests`. Python 3.9+. See the note under [Install frankAllSkyCam](#2-install-frankallskycam) about `opencv-python-headless` sometimes needing a slow source build on a Pi.
