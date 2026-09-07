@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, weatherexport
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -111,6 +111,13 @@ FTP_pass = str(config['ftp']['FTP_pass'])
 FTP_uploadFolder = str(config['ftp']['FTP_uploadFolder'])
 FTP_fileNameAllSkyImg = str(config['ftp']['FTP_fileNameAllSkyImgJPG'])
 FTP_fileName = FTP_uploadFolder + "/" + FTP_fileNameAllSkyImg
+# optional - fallback() keeps this working on existing config.txt files
+# that predate this feature (no re-seeding). Defaults to disabled: an
+# upgrading install with isFTP already True must not suddenly start
+# uploading to an unconfigured FTP_fileNameWeatherJSON path.
+weather_export_enabled = config.getboolean('weather_export', 'enabled', fallback=False)
+weather_export_station_url = config.get('weather_export', 'station_url', fallback='')
+FTP_fileNameWeatherJSON = config.get('ftp', 'FTP_fileNameWeatherJSON', fallback='')
 
 tz = ZoneInfo(time_zone)
 x = datetime.datetime.now(tz)
@@ -354,6 +361,15 @@ def _run():
        sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs, twilight_isp_mode=twilight_isp_mode)
        data["stars"] = sst
        data["clouds"] = scl
+
+       # true night only (exposure_secs is None for both daytime and
+       # twilight_isp_mode) - SQM/star count/cloud cover aren't meaningful
+       # outside a real dark-sky exposure, same rule SQM measurement itself
+       # already follows.
+       if weather_export_enabled and exposure_secs is not None:
+          weatherexport.exportAndUpload(appPath, weather_export_station_url, sqm, sst, scl, x,
+                                         isFTP, FTP_server, FTP_login, FTP_pass,
+                                         FTP_fileNameWeatherJSON)
 
        if exposure_secs is not None:
           # feed this run's own raw (pre-watermark) frame back into the

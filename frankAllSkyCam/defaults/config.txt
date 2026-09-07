@@ -260,6 +260,30 @@ FTP_fileNameTimelapseMP4 = /video/frankAllSkycam
 # starTrail.jpg will be generated
 FTP_fileNameStarTrailJPG = /startrail/startrail.jpg
 
+# combined weather/sky JSON (see [weather_export] below) - only used if
+# weather_export.enabled = True. Like the img/video/startrail folders
+# above, create this folder on your FTP server yourself first - STOR does
+# not create missing directories.
+FTP_fileNameWeatherJSON = /weather/weather.json
+
+[weather_export]
+# publishes a single combined JSON file (SQM, star count, cloud cover, plus
+# a live reading from your WS90-style weather station) to your FTP server
+# every night-time capture - see FTP_fileNameWeatherJSON above for where.
+# Requires isFTP = True above; has no effect otherwise. Only ever runs at
+# night (twilight and daytime captures are skipped), since SQM/star
+# count/cloud cover aren't meaningful outside a real dark-sky exposure.
+enabled = True
+
+# full JSON URL of your WS90-style weather station (same kind of URL as
+# generateExtraData.conf's station_url, but configured here independently -
+# this feature does not read generateExtraData.py's own output or config).
+# Leave empty to still export SQM/star count/cloud cover with weather
+# fields zeroed. Fetched with a short timeout and no retries (unlike
+# generateExtraData.py's own fetch), since this runs in the main capture
+# loop - a slow/unreachable station must never delay the next capture.
+station_url =
+
 [sqm]
 # info about your SQM-LE reader (if you have not it, just let use_sqm_le = n)
 # directory where to save sqm info
