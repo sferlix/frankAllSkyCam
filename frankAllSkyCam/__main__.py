@@ -369,7 +369,7 @@ def _run():
        if weather_export_enabled and exposure_secs is not None:
           weatherexport.exportAndUpload(appPath, weather_export_station_url, sqm, sst, scl, x,
                                          isFTP, FTP_server, FTP_login, FTP_pass,
-                                         FTP_fileNameWeatherJSON)
+                                         FTP_uploadFolder + FTP_fileNameWeatherJSON)
 
        if exposure_secs is not None:
           # feed this run's own raw (pre-watermark) frame back into the
