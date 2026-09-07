@@ -245,6 +245,8 @@ crontab -l | grep -v '#frankAllSkyCam-managed' | crontab -
 rm -rf ~/frankAllSkyCam
 ```
 
+`rm -rf` is irreversible - back up anything you still need from `~/frankAllSkyCam` first (a customized `config.txt`, images you haven't uploaded/FTP'd elsewhere, ...) before running it.
+
 ## License
 
 GPLv3 - see [LICENSE](LICENSE).
