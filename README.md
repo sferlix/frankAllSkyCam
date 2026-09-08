@@ -56,13 +56,13 @@ Install ImageMagick's development headers (needed to render the moon-phase image
 sudo apt install libmagickwand-dev
 ```
 
-frankAllSkyCam uses **libcamera** (bundled with current Raspberry Pi OS). The older `raspistill` is not supported. Check the camera works before going further:
+frankAllSkyCam uses the **libcamera** camera stack - as `rpicam-still`/`rpicam-jpeg` on a current Raspberry Pi OS image (Raspberry Pi renamed the `libcamera-apps` package to `rpicam-apps`; a fresh install has `rpicam-*` pre-installed and no `libcamera-*` binaries at all), or as `libcamera-still`/`libcamera-jpeg` on an older release still using the pre-rename package - frankAllSkyCam auto-detects whichever one is actually installed, so either OS release works without any configuration. The older, pre-libcamera `raspistill` is not supported. Check the camera works before going further:
 
 ```
 rpicam-jpeg -o test.jpg --immediate -n
 ```
 
-On an older Raspberry Pi OS release still using the pre-rename `libcamera-apps` package, use `libcamera-jpeg` instead - frankAllSkyCam itself auto-detects whichever one (`rpicam-still` or `libcamera-still`) is actually installed, so either OS release works without any configuration.
+On an older Raspberry Pi OS release, use `libcamera-jpeg` instead.
 
 You should see it capture and leave a `test.jpg` in the current folder.
 
