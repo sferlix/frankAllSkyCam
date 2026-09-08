@@ -27,6 +27,11 @@ def test_night_start_end_are_iso8601_utc():
     assert data["NightEnd"] == "2026-09-08T03:12:00Z"
     assert data["timestamp"] == "2026-09-08T04:09:00Z"
 
+    # timestamp_local carries the same instant in the site's own wall-clock
+    # time (ASCOM/Alpaca clients want UTC above; this is for anything else
+    # that wants to display/consume local time without redoing the math)
+    assert data["timestamp_local"] == "2026-09-08T06:09:00+02:00"
+
 
 def test_missing_station_url_still_produces_zeroed_weather_fields():
     tz = datetime.timezone.utc

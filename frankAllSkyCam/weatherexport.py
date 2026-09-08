@@ -76,6 +76,12 @@ def buildExportData(station_url, sqm, star_count, cloud_cover, when, night_start
 
     return {
         "timestamp": when.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # ASCOM/Alpaca clients read "timestamp" (UTC, above) - this is for
+        # anything downstream that wants the site's own wall-clock time
+        # without doing the UTC conversion itself. ISO8601 with a numeric
+        # offset (e.g. +02:00), not a bare local string, so it stays
+        # unambiguous/parseable on its own.
+        "timestamp_local": when.isoformat(timespec="seconds"),
         # from calculateEphem.calculate()'s tz-aware nightStartDt/nightEndDt
         # (astronomical twilight, sun at -18deg) - same UTC ISO8601 format
         # as timestamp above, not the "HH:MM+1"-style string the on-image
