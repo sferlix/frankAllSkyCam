@@ -11,6 +11,8 @@ Open-source AllSky camera software for a **Raspberry Pi + Pi HQ Camera** (or com
 
 Everything runs unattended via cron, installed with a single command.
 
+![Fireball captured by frankAllSkyCam](docs/images/fireball.jpg)
+
 ## Quick install
 
 ```
