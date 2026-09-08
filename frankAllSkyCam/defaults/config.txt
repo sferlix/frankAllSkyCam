@@ -269,10 +269,11 @@ FTP_fileNameWeatherJSON = /weather/weather.json
 [weather_export]
 # publishes a single combined JSON file (SQM, star count, cloud cover, plus
 # a live reading from your WS90-style weather station) to your FTP server
-# every night-time capture - see FTP_fileNameWeatherJSON above for where.
-# Requires isFTP = True above; has no effect otherwise. Only ever runs at
-# night (twilight and daytime captures are skipped), since SQM/star
-# count/cloud cover aren't meaningful outside a real dark-sky exposure.
+# on every capture, day and night - see FTP_fileNameWeatherJSON above for
+# where. Requires isFTP = True above; has no effect otherwise. SQM and star
+# count are always 0 outside a real dark-sky exposure (not meaningful in
+# daylight/twilight), but cloud cover and the weather-station reading are
+# published around the clock.
 enabled = True
 
 # full JSON URL of your WS90-style weather station (same kind of URL as

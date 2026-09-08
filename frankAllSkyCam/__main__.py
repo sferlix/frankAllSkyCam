@@ -383,11 +383,12 @@ def _run():
        data["stars"] = sst
        data["clouds"] = scl
 
-       # true night only (exposure_secs is None for both daytime and
-       # twilight_isp_mode) - SQM/star count/cloud cover aren't meaningful
-       # outside a real dark-sky exposure, same rule SQM measurement itself
-       # already follows.
-       if weather_export_enabled and exposure_secs is not None:
+       # runs every capture, day and night - sqm/sst are already forced to
+       # 0 outside a true night capture (readsqm()'s daytime=True branch,
+       # starscalc._analyze_day()), so this never actually publishes a
+       # computed SQM/star count from daylight, only real zeros. cloud_cover
+       # (scl) is independently valid day or night (see comment above).
+       if weather_export_enabled:
           weatherexport.exportAndUpload(appPath, weather_export_station_url, sqm, sst, scl, x,
                                          data["nightStartDt"], data["nightEndDt"],
                                          isFTP, FTP_server, FTP_login, FTP_pass,

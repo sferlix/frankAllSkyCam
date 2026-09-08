@@ -10,9 +10,13 @@
  this feature stays independent of that script's own config file
  (generateExtraData.conf) and cron schedule.
 
- Only meaningful for a true night-time capture (see __main__.py's call
- site) - SQM/star count/cloud cover aren't valid outside a real dark-sky
- exposure, matching the same rule SQM measurement itself already follows.
+ Runs on every capture, day and night (see __main__.py's call site) - the
+ weather-station reading and cloud cover are meaningful around the clock.
+ SQM and star count are the exception: both are already forced to 0 outside
+ a real dark-sky exposure by their own producers (sqmreader.readSQM's
+ daytime branch, starscalc._analyze_day), the same rule SQM measurement
+ itself follows, so this module never has to gate on time of day itself -
+ it just publishes whatever it's given.
 '''
 
 import os
