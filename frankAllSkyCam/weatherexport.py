@@ -1,5 +1,6 @@
 '''
- combines SQM/star-count/cloud-cover from the current capture with a live
+ combines SQM/star-count/cloud-cover from the current capture, tonight's
+ astronomical-twilight night start/end (see calculateEphem.py), and a live
  reading from your WS90-style weather station, into a single JSON file
  published to the same FTP site as the AllSkyCam image (see
  [weather_export] in config.txt).
@@ -66,11 +67,17 @@ def _sensorValue(sensors, key, fallback_key=None, default=0.0):
     return entry.get("value", default)
 
 
-def buildExportData(station_url, sqm, star_count, cloud_cover, when):
+def buildExportData(station_url, sqm, star_count, cloud_cover, when, night_start, night_end):
     sensors = _fetchWS90Sensors(station_url)
 
     return {
         "timestamp": when.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # from calculateEphem.calculate()'s tz-aware nightStartDt/nightEndDt
+        # (astronomical twilight, sun at -18deg) - same UTC ISO8601 format
+        # as timestamp above, not the "HH:MM+1"-style string the on-image
+        # overlay uses, which a generic JSON consumer can't parse.
+        "NightStart": night_start.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "NightEnd": night_end.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "CloudCover": cloud_cover,
         "DewPoint": _sensorValue(sensors, "dewpoint"),
         "Humidity": _sensorValue(sensors, "humidity_u8", fallback_key="humidity"),
@@ -95,8 +102,10 @@ def buildExportData(station_url, sqm, star_count, cloud_cover, when):
 
 
 def exportAndUpload(appPath, station_url, sqm, star_count, cloud_cover, when,
+                     night_start, night_end,
                      isFTP, FTP_server, FTP_login, FTP_pass, FTP_fileName):
-    export_data = buildExportData(station_url, sqm, star_count, cloud_cover, when)
+    export_data = buildExportData(station_url, sqm, star_count, cloud_cover, when,
+                                   night_start, night_end)
 
     local_path = appPath + LOCAL_JSON_FILENAME
     try:

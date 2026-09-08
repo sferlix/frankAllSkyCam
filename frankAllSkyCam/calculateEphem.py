@@ -144,6 +144,13 @@ def calculate(dt):
       "sunSet": ss,
       "nightStart": ns,
       "nightEnd": ne,
+      # tz-aware datetimes (as opposed to the "HH:MM+1"-style display
+      # strings above, meant for the on-image overlay) - weatherexport.py
+      # reformats these to ISO8601 UTC, matching weather.json's own
+      # "timestamp" field, rather than a +1/-1 suffixed local string a
+      # generic JSON consumer can't parse.
+      "nightStartDt": nStart,
+      "nightEndDt": nEnd,
       "moonPhase": str(int(phase*100))+"% - " + human_phase,
       "mp": mp
       }

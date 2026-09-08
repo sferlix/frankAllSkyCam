@@ -249,7 +249,21 @@ def _run():
     command = fileManager.getCameraBinary() + " -n -o " + jpg_file_name
     command += " --width " + str(horiz)
     command += " --height "+ str(vert)
-    command += " --immediate "
+    # twilight-handoff frames omit --immediate so the ISP's own AGC/AWB
+    # convergence loop runs before the still is taken, instead of grabbing
+    # whatever the sensor's gain register happens to hold right now.
+    # Confirmed on a real dawn sequence: with --immediate, ExposureTime
+    # (--metadata) stayed frozen at an identical value (0.07s) across 6+
+    # consecutive twilight_isp_mode captures spanning several real minutes
+    # while the frame visibly brightened underneath it - the AGC's gain was
+    # only advancing one small damped step per run (the sensor register
+    # persisting the previous fixed-shutter capture's very different state)
+    # rather than converging within a single capture. Every other mode
+    # (fixed-shutter night, full daytime) keeps --immediate - neither
+    # exhibits this, since neither hands off from an unrelated exposure
+    # regime mid-capture the way the twilight crossover does.
+    if not twilight_isp_mode:
+       command += " --immediate "
     if exposure >0:
        exposure = exposure * 1000000
        command +=" --shutter " + str(int(exposure)) + " "
@@ -283,7 +297,6 @@ def _run():
           command += " --mode " + night_mode
        command += " --denoise cdn_hq --sharpness " + night_sharpness + " --contrast " + night_contrast + " "
     else:
-       command += additional_day_params
        if twilight_isp_mode:
           # let the ISP auto-expose this twilight frame (same as full
           # daytime) and harvest what it actually chose back via metadata,
@@ -295,14 +308,22 @@ def _run():
              os.remove(ISP_METADATA_PATH)
           except OSError:
              pass
+          # deliberately does NOT use additional_day_params (--metering
+          # average) here: on a fisheye, "average" factors in the bright
+          # horizon ring, visible well before the zenith is at twilight,
+          # pulling the ISP's target down exactly when the opposite is
+          # needed. Centre-weighted metering reads the still-dark zenith
+          # instead. Full daytime keeps --metering average, below - the sky
+          # fills the whole frame fairly evenly by then, so this bias
+          # doesn't apply and isn't reported as wrong.
+          command += " --metering centre "
           command += " --metadata " + ISP_METADATA_PATH + " --metadata-format json "
-          # --metering average factors in the large near-black margin outside
-          # the fisheye circle (and, at twilight, an already-darker sky than
-          # full daytime), pulling the ISP's own target down - a small,
-          # twilight-only EV bias nudges it back up without touching the
-          # (unaffected, not reported as wrong) full daytime exposure.
+          # --ev nudges the ISP's own metered target - a small, twilight-
+          # only bias on top of the centre-metering fix above.
           if ae_twilight_ev_bias:
              command += " --ev " + str(ae_twilight_ev_bias)
+       else:
+          command += additional_day_params
 
     try:
        #launch the command line
@@ -368,6 +389,7 @@ def _run():
        # already follows.
        if weather_export_enabled and exposure_secs is not None:
           weatherexport.exportAndUpload(appPath, weather_export_station_url, sqm, sst, scl, x,
+                                         data["nightStartDt"], data["nightEndDt"],
                                          isFTP, FTP_server, FTP_login, FTP_pass,
                                          FTP_uploadFolder + FTP_fileNameWeatherJSON)
 
