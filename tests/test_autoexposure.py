@@ -1,6 +1,7 @@
 '''
 Unit tests for the pure decision logic in autoexposure.py:
- - compute_raw_next: the unclamped feedback-loop prediction
+ - compute_raw_next: the feedback-loop prediction (plain ratio, step-limited
+   on the upward side only - see MAX_EXPOSURE_STEP_FACTOR)
  - should_use_isp: the twilight-handoff crossover test (dusk and dawn share
    this one code path - no direction flag)
  - getExposure's saturation-severity guard: a previous frame with a large
@@ -52,6 +53,29 @@ def test_compute_raw_next_none_when_last_exposure_zero():
     assert autoexposure.compute_raw_next(0.0, 60.0, target_mean=30.0) is None
 
 
+def test_compute_raw_next_caps_extreme_upward_extrapolation():
+    # real dusk-sequence bug numbers: an ISP-driven frame at exposure=0.06s
+    # measured mean=1.6 (near-black - dominated by sensor noise floor, not
+    # real scene signal). The plain ratio (0.06*30/1.6 = 1.125s, an ~18.75x
+    # jump) is what produced a real overexposed frame (mean 53.9 instead of
+    # the target 30) one minute later - capped here to at most
+    # MAX_EXPOSURE_STEP_FACTOR (5x) over last_exposure instead.
+    result = autoexposure.compute_raw_next(0.06, 1.6, target_mean=30.0)
+
+    assert result == pytest.approx(0.06 * autoexposure.MAX_EXPOSURE_STEP_FACTOR)
+    assert result < 1.125  # the real, unclamped, overshooting value
+
+
+def test_compute_raw_next_does_not_cap_downward_steps():
+    # a badly overexposed/clipped previous frame needs to be free to cut
+    # exposure hard, however large the downward ratio - only growth is
+    # capped (see test_getExposure_cuts_harder_when_previous_frame_was_saturated,
+    # which needs an ~7.6x downward step to go through uncapped)
+    result = autoexposure.compute_raw_next(1.0, 229.0, target_mean=30.0)
+
+    assert result == pytest.approx(1.0 * (30.0 / 229.0))
+
+
 # ---- should_use_isp (the twilight crossover test) ----------------------
 
 def test_should_use_isp_true_when_no_state_file(appPath):
@@ -65,6 +89,20 @@ def test_should_use_isp_true_when_raw_next_below_floor(appPath):
     # prediction is 1.0*(30/229) =~ 0.13s, well under the 1.0s floor, so the
     # ISP - not the fixed-shutter algorithm - should still be driving capture
     write_state(appPath, exposure_secs=1.0, mean=229.0)
+    assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
+
+
+def test_should_use_isp_stays_true_after_a_near_black_isp_frame(appPath):
+    # regression for the real twilight-oscillation bug: an ISP-driven
+    # capture at exposure=0.06s measured mean=1.6 (real dusk-sequence
+    # numbers). Without the upward step cap, the plain-ratio prediction
+    # (1.125s) sat above the 1.0s floor, flipping should_use_isp() to False
+    # and handing the very next capture to a fixed-shutter exposure
+    # extrapolated off a noise-floor-dominated sample - which is exactly
+    # what produced the real overexposed frame (mean 53.9 instead of
+    # target 30) this state is modeling. With the cap, raw_next stays at
+    # 0.3s, still under the floor, so the ISP keeps driving instead.
+    write_state(appPath, exposure_secs=0.06, mean=1.6)
     assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
 
 

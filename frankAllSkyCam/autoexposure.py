@@ -53,6 +53,29 @@ STATE_FILENAME = "autoexposure_state.json"
 # clip_frac - matches the sensor's practical 8-bit ceiling region.
 SATURATION_CLIP_PIXEL_THRESHOLD = 250
 
+# max single-step multiplicative INCREASE compute_raw_next is allowed to
+# request over last_exposure - growing the shutter, never shrinking it (a
+# large downward step is the correct, wanted response to a genuinely
+# overexposed/clipped previous frame - see the saturation-severity guard
+# below, which needs to be free to cut hard). Confirmed on a real dusk
+# sequence (one-minute cadence): should_use_isp() flapped True/False every
+# run right at the twilight-handoff crossover - each ISP-driven run wrote
+# a near-black state (exposure=0.06s, mean~1.2-1.6, real numbers from the
+# capture), and the very next (fixed-shutter) run extrapolated the plain
+# ratio straight off it: 0.06*(30/1.6)=1.125s and 0.06*(30/1.2)=1.5s,
+# matching the two real overexposed frames (1.11s/mean 53.9 and 1.48s/mean
+# 52.3) almost exactly. At that exposure/mean level the raw mean is
+# dominated by sensor black-level/read noise rather than real scene
+# signal, so scaling it up 19-25x amplifies that noise floor into a
+# ~1.7-1.8x overshoot past target_mean - and the overexposed result then
+# reads bright enough to flip should_use_isp() straight back to
+# ISP-driven, repeating the cycle every single run instead of converging.
+# A real, working transition (see the auto_exposure module docstring's own
+# dawn-sequence numbers, Exp(s) 4.25 -> 1.01) moves by roughly 4x in one
+# step - 5x leaves headroom above that while decisively blocking the
+# ~19-25x blowup that caused this.
+MAX_EXPOSURE_STEP_FACTOR = 5.0
+
 # sqmreader.py/config.txt both call this the (user-configurable) [sqm]
 # sqmFolder key - default "sqm" matches what was previously hardcoded here.
 _config = ConfigParser()
@@ -145,10 +168,20 @@ def compute_raw_next(last_exposure, last_mean, target_mean):
     whether the sky is really dark enough yet for a floored value to be
     meaningful; getExposure calls it too, as the first step of the value it
     actually returns.
+
+    The plain ratio is capped to at most a MAX_EXPOSURE_STEP_FACTOR
+    increase over last_exposure - see that constant's comment for the real
+    twilight-oscillation bug this closes. Downward steps are left
+    unclamped (a previous frame reading badly overexposed/clipped needs to
+    be free to cut exposure hard - see the saturation-severity guard
+    below). Still "raw": this is the naive-ratio step limited, not a
+    smarter model, and should_use_isp/getExposure's own further
+    adjustments still apply on top of it.
     '''
     if last_mean <= 0 or last_exposure <= 0:
         return None
-    return last_exposure * (target_mean / last_mean)
+    raw = last_exposure * (target_mean / last_mean)
+    return min(raw, last_exposure * MAX_EXPOSURE_STEP_FACTOR)
 
 
 def _severity_adjusted_next(raw_next, last_clip_frac, saturation_clip_frac_threshold,
