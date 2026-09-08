@@ -378,8 +378,27 @@ def _run():
        # does have the ISP's harvested real value, which is just as good
        # for exposure-normalized cloud detection
        cloud_exposure_secs = exposure_secs if exposure_secs is not None else harvested_exposure_secs
+
+       # cloud_exposure_secs being unknown with the sun below the horizon
+       # means the ISP metered this capture, not just under exposure_mode=
+       # "auto_exposure": calculateExposure() returns 0 for any sq<9 SQM
+       # reading regardless of exposure_mode, and that 0 routes capture
+       # into the same ISP-auto (additional_day_params) branch as a real
+       # twilight-handoff frame - just without the metadata harvesting,
+       # since that's still gated on twilight_isp_mode above. Confirmed on
+       # a real sqm_based-mode night: every dusk/dawn frame in that window
+       # (exposure_mode never "auto_exposure", so twilight_isp_mode was
+       # always False here) read exposure_secs=None into
+       # _estimate_cloud_cover's brightness fallback, which is calibrated
+       # for deep-night mean_gray (33-50) - an ISP-metered twilight frame
+       # is brighter than that by construction, so it pegged at 100% cloud
+       # on a clear sky, repeatably, every dusk and dawn. Widening the
+       # flag (without touching the capture command / exposure_mode logic
+       # above) routes these frames to the exposure-independent NRBR
+       # signal instead, same as a real auto_exposure-mode handoff frame.
+       cloud_is_isp_driven = twilight_isp_mode or (cloud_exposure_secs is None and sun_alt < 0)
        print("calculating stars on: " + jpg_file_name)
-       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs, twilight_isp_mode=twilight_isp_mode)
+       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs, twilight_isp_mode=cloud_is_isp_driven)
        data["stars"] = sst
        data["clouds"] = scl
 

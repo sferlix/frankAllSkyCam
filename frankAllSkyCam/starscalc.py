@@ -36,7 +36,11 @@ competes with it during the day, unlike at night. Cloud cover is estimated
 via the Normalized Red-Blue Ratio (NRBR = (B-R)/(B+R)), a standard
 sky-camera technique: clear sky is strongly blue (Rayleigh scattering), a
 cloud is white/gray (R roughly equal to B). The Sun is masked the same way
-the Moon is at night (large near-saturated blob + halo).
+the Moon is at night (large near-saturated blob + halo). The per-pixel
+NRBR score is aggregated via a percentile, not the mean - see
+DAY_NRBR_AGG_PERCENTILE - since a wide fisheye ROI also picks up genuine
+non-cloud whitening (circumsolar aureole, horizon-ward Rayleigh whitening)
+that contaminates a minority of sky pixels without it being cloud.
 
 Interface: analyze_sky_robust(image_path, diametro_rapporto, sensibilita,
 min_contrasto, exposure_secs=None) -> (star_count, cloud_cover_percent).
@@ -119,6 +123,24 @@ DAY_NRBR_CLEAR = 0.40            # calibrated clear-blue-sky NRBR (zenith measur
 DAY_NRBR_CLOUD = 0.12            # calibrated white/gray NRBR (measured on Sun-flare/near-white
                                   # pixels as a stand-in for overcast, which reads the same way:
                                   # R roughly equal to B)
+DAY_NRBR_AGG_PERCENTILE = 40     # a single DAY_NRBR_CLEAR margin isn't enough on a wide fisheye
+                                  # ROI: confirmed on a real clear day (0.65 ROI), NRBR-derived
+                                  # cloud-score climbs from ~30% at zenith to 80-97% near the
+                                  # horizon and, independently, on the sun's side of the frame even
+                                  # well short of the bright-source halo (75%+ within 45 degrees of
+                                  # the sun's azimuth, out to near zenith) - real effects (Rayleigh
+                                  # whitening toward the horizon; circumsolar aureole), not noise.
+                                  # Both contaminate a MINORITY of sky pixels, so the mean is pulled
+                                  # up disproportionately; a below-median percentile is far less
+                                  # sensitive to that tail while a genuinely mostly-overcast sky
+                                  # (most pixels high-scoring) is barely affected - confirmed against
+                                  # 40 real daytime frames from one real camera/day: this percentile
+                                  # cut the false-positive tail on clear/lightly-hazy frames by
+                                  # 10-30 points while leaving the two most heavily-clouded frames in
+                                  # that set within ~1 point of the old mean-based score. Single
+                                  # day/site/season of validation - revisit with more reference days
+                                  # (other seasons, other sun-elevation ranges) before trusting the
+                                  # exact percentile value.
 
 HAZE_BG_SIGMA = 120              # heavy enough to discard both star-scale and cloud-scale
                                   # ("texture") content, keeping only the broadest glow structure
@@ -233,7 +255,8 @@ def _estimate_cloud_cover_nrbr(img, sky_mask):
     nrbr = (b - r) / (b + r + 1e-6)
     sky_nrbr = nrbr[sky_mask == 255]
     score = np.clip((DAY_NRBR_CLEAR - sky_nrbr) / (DAY_NRBR_CLEAR - DAY_NRBR_CLOUD), 0, 1)
-    return round(100.0 * score.mean(), 1)
+    # percentile, not mean - see DAY_NRBR_AGG_PERCENTILE
+    return round(100.0 * np.percentile(score, DAY_NRBR_AGG_PERCENTILE), 1)
 
 
 def _erode_guard_band(sky):
