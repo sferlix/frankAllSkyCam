@@ -16,11 +16,18 @@ the analysis circle. This version:
    filtering (circularity, elongation) and spatial declustering to reject
    dense clumps of false triggers (the signature of foliage texture,
    distinct from sparse real stars);
- - estimates cloud cover from two independent physical signals: sky
+ - estimates cloud cover from three independent physical signals: sky
    radiance rate (mean brightness / exposure time - clouds reach the same
    brightness in a much shorter exposure than the camera's own adaptive
-   exposure would pick for clear sky) and mid-scale ("cloud-scale") texture,
-   isolated by band-pass from both star-scale and gradient-scale content.
+   exposure would pick for clear sky), mid-scale ("cloud-scale") texture,
+   isolated by band-pass from both star-scale and gradient-scale content,
+   and (night only, see _estimate_cloud_cover_haze) broad-scale background
+   patchiness - thin/smooth veil cloud is invisible to the other two (it
+   raises neither the radiance rate enough at typical exposures nor the
+   band-pass texture, which is actually calibrated the other way: real
+   clear-sky texture at that scale, from faint stars/sensor noise, reads
+   *higher* than a smoothing veil does), but still breaks up the sky's
+   otherwise smooth glow into patches at a much coarser scale than either.
 
 Daytime frames get a separate branch (no stars to find; different cloud
 physics): trees are lit rather than black, so obstruction is detected via
@@ -113,6 +120,15 @@ DAY_NRBR_CLOUD = 0.12            # calibrated white/gray NRBR (measured on Sun-f
                                   # pixels as a stand-in for overcast, which reads the same way:
                                   # R roughly equal to B)
 
+HAZE_BG_SIGMA = 120              # heavy enough to discard both star-scale and cloud-scale
+                                  # ("texture") content, keeping only the broadest glow structure
+HAZE_SPREAD_LOW = 6.0            # calibrated clear-sky p90-p10 spread of that broad background
+                                  # (max observed 5.6 across 3 real clear-sky reference captures)
+HAZE_SPREAD_HIGH = 14.0          # calibrated patchy-cloud/moon-behind-cloud spread (10.6-12.6
+                                  # observed on real partly-cloudy and moon-behind-cloud captures) -
+                                  # small reference set (6 real images); revisit if false-flagging
+                                  # a genuinely clear night, or missing an actually hazy one
+
 
 def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False):
     """
@@ -165,6 +181,18 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
         cloud_cover = _estimate_cloud_cover_nrbr(img, sky_eroded)
     else:
         cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs)
+        if not source_found:
+            # skipped with the Moon (or another dominant bright source) in
+            # frame - its glow extends well beyond _bright_source_mask's
+            # halo at this signal's HAZE_BG_SIGMA smoothing scale, and
+            # confounds the same broad-glow-patchiness signal this measures
+            # (confirmed on a real clear+Moon reference: spread 23.5, higher
+            # than any real cloud case measured). Only real gap this leaves:
+            # thin veil cloud specifically while the Moon is also in frame -
+            # falls back to the two signals above, same as before this signal
+            # existed.
+            haze_cover = _estimate_cloud_cover_haze(gray, sky_eroded)
+            cloud_cover = round(max(cloud_cover, 100.0 * haze_cover), 1)
 
     print("end of starscalc. Stars =" + str(star_count) + ", clouds = " + str(cloud_cover) +
           "%" + (" (moon in frame)" if source_found else ""))
@@ -449,6 +477,42 @@ def _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs):
         brightness_signal = _clip01((mean_gray - CLOUD_BRIGHTNESS_LOW) / (CLOUD_BRIGHTNESS_HIGH - CLOUD_BRIGHTNESS_LOW))
 
     return round(100.0 * max(texture_score, brightness_signal), 1)
+
+
+def _estimate_cloud_cover_haze(gray, sky_mask):
+    '''
+    Catches thin/smooth veil cloud that both signals above miss: confirmed on
+    a real capture (SQM 21.31, Exp 48.02s, 70 stars still visible) that read
+    3.3% cloud despite a visible broad veil - its mean_gray (34.2) and
+    cloud-scale tex_std (4.4) both landed inside the range measured on
+    genuinely clear reference nights (mean_gray 32-36, tex_std 3.0-4.0), so
+    neither existing signal had anything to key off. The gap: cloud-scale
+    texture (_estimate_cloud_cover) is calibrated on the assumption that
+    cloud reads as *more* texture than clear sky at that band-pass scale -
+    true for structured/cumulus cloud, backwards for a smooth veil, which
+    reads as *less* texture than the faint-star/sensor-noise floor a clear
+    sky already has there.
+
+    A thin veil is still real cloud, though, and light pollution scattering
+    through it still breaks the sky's otherwise smooth glow into patches -
+    just at a much coarser scale than either existing signal's band-pass
+    isolates. Heavily blurring past both star-scale and cloud-scale content
+    (HAZE_BG_SIGMA) leaves only that broad structure, and its p90-p10 spread
+    across the sky area is measurably tighter on a real clear night (max 5.6
+    across 3 references) than on a real patchy/hazy one (10.6-12.6 across a
+    partly-cloudy and a moon-behind-cloud reference) - see analyze_sky_robust
+    for the source_found gate this needs (the Moon's glow at this smoothing
+    scale is itself an even larger confound: 23.5 on a real clear+Moon
+    reference, higher than any real cloud case measured).
+
+    Calibrated on 6 real images total (3 clear, 3 cloudy/hazy) - the
+    smallest reference set of any signal in this module. Revisit
+    HAZE_SPREAD_LOW/HIGH if this over- or under-reports in practice.
+    '''
+    bg = cv2.GaussianBlur(gray.astype(np.float64), (0, 0), sigmaX=HAZE_BG_SIGMA)
+    vals = bg[sky_mask == 255]
+    spread = np.percentile(vals, 90) - np.percentile(vals, 10)
+    return _clip01((spread - HAZE_SPREAD_LOW) / (HAZE_SPREAD_HIGH - HAZE_SPREAD_LOW))
 
 
 def _clip01(x):
