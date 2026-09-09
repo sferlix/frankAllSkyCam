@@ -113,6 +113,43 @@ def test_should_use_isp_false_when_raw_next_at_or_above_floor(appPath):
     assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is False
 
 
+def test_should_use_isp_stays_stuck_across_a_real_frame_duration_ceiling(appPath):
+    # regression for the v46 real dawn/dusk sequences (2026-09-09): the
+    # ISP-harvested exposure hard-caps around 0.06s on this imx477 pipeline
+    # (confirmed on real hardware afterwards - baseline, --exposure long,
+    # and --timeout 5000 all came back bit-identical: ExposureTime=60000,
+    # AnalogueGain=4.39, AeLocked=false - it's a genuine ceiling, not a
+    # convergence-time issue). That harvested (exposure, mean) pair is also
+    # from a different AnalogueGain regime than fixed-shutter night capture
+    # uses (--gain 10), so feeding it into compute_raw_next's ratio is a
+    # category error on top of the ceiling. Whatever the ceiling's cause,
+    # this asserts should_use_isp() has no self-correcting mechanism against
+    # a stuck ISP-sourced reading: fed the actual recorded state at any
+    # point in the stuck run, it keeps deferring to the ISP every time. That
+    # is still true and expected of should_use_isp() in isolation - the fix
+    # is not here, it's the sun-altitude backstop in __main__.py's
+    # twilight_isp_mode gate (ae_twilight_isp_backstop_deg), which stops
+    # calling should_use_isp() at all once the sun is past astronomical
+    # twilight, exactly because this function has no way to recover from a
+    # stuck ISP-sourced state on its own.
+    for mean_at_ceiling in (1.026, 13.703, 50.787):
+        write_state(appPath, exposure_secs=0.06, mean=mean_at_ceiling)
+        assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
+
+
+def test_should_use_isp_exits_cleanly_once_isp_reports_a_real_exposure(appPath):
+    # once the capture-command fix lets the ISP report a genuine, unclamped
+    # exposure again (same real sequence, the last good fixed-shutter frame
+    # at 06:11: exposure=1.93s, measured mean=34.90, close to target 30),
+    # the crossover must hand back to fixed-shutter control instead of
+    # re-entering twilight_isp_mode - confirms MAX_EXPOSURE_STEP_FACTOR's
+    # upward cap (needed for the dusk-oscillation bug, see
+    # test_should_use_isp_stays_true_after_a_near_black_isp_frame) does not
+    # also trap a *correctly*-exposed harvested ISP frame behind the floor.
+    write_state(appPath, exposure_secs=1.93, mean=34.904)
+    assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is False
+
+
 def test_should_use_isp_applies_same_saturation_adjustment_as_getExposure(appPath):
     # mid-night, a cloud reflecting light pollution saturates a 20s exposure
     # (clip_frac=0.6, mean=255). Chosen so the PLAIN ratio (20*30/255 ~=

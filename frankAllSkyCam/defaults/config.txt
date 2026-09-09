@@ -222,6 +222,20 @@ seed_exposure_secs = 5
 # leftover state from many hours earlier (e.g. this morning's dawn) -
 # it is not what sizes the handoff.
 twilight_guard_deg = 3
+
+# hard backstop: past this many degrees below the horizon, always use a real
+# fixed-shutter capture, never the ISP handoff, regardless of what the
+# feedback loop's own ratio check says. Default -18 deg matches astronomical
+# twilight (this app's own "true night" boundary, see nightStart/nightEnd).
+# Confirmed necessary on real hardware (2026-09-09): the ISP's own
+# auto-exposure hard-caps around 0.06s on the imx477 pipeline here, at a
+# different gain than fixed-shutter night capture uses, so the feedback
+# loop's ratio math could never conclude "the sky is dark enough now" from
+# that harvested value - twilight_isp_mode stayed stuck all night on two
+# separate installations. Cloud cover can only make the sky darker than
+# clear-sky-at-this-altitude, never brighter, so forcing the floor here can
+# never be the wrong direction.
+twilight_isp_backstop_deg = 18
 # EV compensation applied only to twilight-handoff (ISP-driven) captures,
 # not to full daytime - --metering average factors in the large near-black
 # margin outside the fisheye circle, which can leave the ISP's own target

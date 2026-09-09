@@ -99,6 +99,20 @@ ae_seed_exposure_secs = config.getfloat('auto_exposure', 'seed_exposure_secs', f
 # twilight-handoff/saturation-guard settings - see autoexposure.py module
 # docstring for why the crossover test replaces a fixed sun-altitude band.
 ae_twilight_guard_deg = config.getfloat('auto_exposure', 'twilight_guard_deg', fallback=3.0)
+# hard backstop, independent of should_use_isp()'s feedback-ratio test - see
+# _run()'s twilight_isp_mode gate for why this exists (real dusk/night data,
+# 2026-09-09: the ISP-harvested exposure hard-capped around 0.06s at a
+# different AnalogueGain than fixed-shutter night capture uses, so
+# should_use_isp()'s ratio math could never produce a raw_next above the
+# floor - twilight_isp_mode stayed True from dusk through the entire night
+# on two real installations). Defaults to -18 deg (astronomical twilight,
+# the same boundary calculateEphem.py already uses for "true night" /
+# nightStart) - past this point cloud cover can only make the sky darker,
+# never brighter, so forcing the fixed-shutter floor here is always the
+# safe direction; worst case is one underexposed frame the feedback loop
+# corrects next cycle, versus the alternative (an unreachable exit
+# condition) losing the rest of the night.
+ae_twilight_isp_backstop_deg = config.getfloat('auto_exposure', 'twilight_isp_backstop_deg', fallback=18.0)
 ae_twilight_ev_bias = config.getfloat('auto_exposure', 'twilight_ev_bias', fallback=0.3)
 ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
 ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
@@ -226,6 +240,12 @@ def _run():
     if exposure_mode == "auto_exposure" and sun_alt < 0:
        if sun_alt >= -ae_twilight_guard_deg:
           twilight_isp_mode = True
+       elif sun_alt <= -ae_twilight_isp_backstop_deg:
+          # past astronomical twilight, never defer to the ISP regardless of
+          # should_use_isp()'s feedback-ratio verdict - see
+          # ae_twilight_isp_backstop_deg above for why that verdict can get
+          # permanently stuck True this deep into the night.
+          twilight_isp_mode = False
        else:
           twilight_isp_mode = autoexposure.should_use_isp(
              appPath, ae_target_mean, ae_min_exposure_secs,
