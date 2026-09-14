@@ -93,6 +93,12 @@ esp_secs = float(config['exposure']['esp_secs'])
 # on existing config.txt files that predate this feature (no re-seeding).
 exposure_mode = config.get('exposure', 'exposure_mode', fallback='sqm_based')
 ae_target_mean = config.getfloat('auto_exposure', 'target_mean', fallback=30.0)
+# true-night-only boosted target (see the sun_alt gate in _run() and
+# autoexposure.moon_adjusted_target_mean) - falls back to ae_target_mean
+# itself (i.e. no boost at all) so an existing config.txt missing this key
+# keeps tonight's exposure byte-identical to before this feature existed;
+# only takes effect once the key is added (defaults/config.txt ships one).
+ae_target_mean_dark_sky = config.getfloat('auto_exposure', 'target_mean_dark_sky', fallback=ae_target_mean)
 ae_roi_percent = config.getfloat('auto_exposure', 'roi_percent', fallback=70.0)
 ae_min_exposure_secs = config.getfloat('auto_exposure', 'min_exposure_secs', fallback=1.0)
 ae_seed_exposure_secs = config.getfloat('auto_exposure', 'seed_exposure_secs', fallback=5.0)
@@ -113,6 +119,9 @@ ae_twilight_guard_deg = config.getfloat('auto_exposure', 'twilight_guard_deg', f
 # corrects next cycle, versus the alternative (an unreachable exit
 # condition) losing the rest of the night.
 ae_twilight_isp_backstop_deg = config.getfloat('auto_exposure', 'twilight_isp_backstop_deg', fallback=18.0)
+# see defaults/config.txt for why this is much lower than min_exposure_secs -
+# only used between twilight_guard_deg and twilight_isp_backstop_deg.
+ae_twilight_min_exposure_secs = config.getfloat('auto_exposure', 'twilight_min_exposure_secs', fallback=0.02)
 ae_twilight_ev_bias = config.getfloat('auto_exposure', 'twilight_ev_bias', fallback=0.3)
 ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
 ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
@@ -237,22 +246,66 @@ def _run():
     # right at the horizon crossing, not the thing sizing the handoff.
     sun_alt = data["sunAlt"]
     twilight_isp_mode = False
+    exposure_min_secs = ae_min_exposure_secs
+    # set alongside twilight_isp_mode below whenever this frame falls in the
+    # -twilight_isp_backstop_deg..-twilight_guard_deg band: real fixed-shutter
+    # capture (twilight_isp_mode=False), but still twilight-bright rather
+    # than deep-night-dark, so its cloud detection needs the same NRBR
+    # treatment as an ISP-driven frame - see cloud_is_isp_driven below.
+    twilight_fixed_shutter_band = False
     if exposure_mode == "auto_exposure" and sun_alt < 0:
        if sun_alt >= -ae_twilight_guard_deg:
           twilight_isp_mode = True
        elif sun_alt <= -ae_twilight_isp_backstop_deg:
-          # past astronomical twilight, never defer to the ISP regardless of
-          # should_use_isp()'s feedback-ratio verdict - see
-          # ae_twilight_isp_backstop_deg above for why that verdict can get
-          # permanently stuck True this deep into the night.
+          # past astronomical twilight - unchanged from v47: always the
+          # normal fixed-shutter floor, never the ISP.
           twilight_isp_mode = False
        else:
-          twilight_isp_mode = autoexposure.should_use_isp(
-             appPath, ae_target_mean, ae_min_exposure_secs,
-             saturation_clip_frac_threshold=ae_saturation_clip_frac_threshold,
-             saturation_severity_gain=ae_saturation_severity_gain)
+          # between twilight_guard_deg and twilight_isp_backstop_deg: used to
+          # ask should_use_isp() here, but real dusk+dawn data (2026-09-10/11,
+          # tools/twilight_shadow_probe.py) showed that deadlocks the exact
+          # same way the pre-v47 bug did all night, just confined to this
+          # band instead - twilight_isp_mode got stuck True for the entire
+          # band (80 real minutes dusk, ~23 real minutes dawn), because an
+          # ISP-driven frame's harvested exposure/mean sits at a different
+          # AnalogueGain than fixed-shutter capture uses, so
+          # should_use_isp()'s ratio math can never honestly conclude the
+          # sky is dark enough. The shadow probe's parallel run of the
+          # ordinary feedback-ratio calc (autoexposure.getExposure, no ISP
+          # deferral at all) with a much lower floor tracked the real sky
+          # smoothly across this exact band on both nights, so run it here
+          # for real instead - see twilight_min_exposure_secs.
+          twilight_isp_mode = False
+          exposure_min_secs = ae_twilight_min_exposure_secs
+          twilight_fixed_shutter_band = True
 
-    exposure = calculateExposure(sqm, twilight_isp_mode)
+    # target_mean boost: only past astronomical twilight (same boundary as
+    # twilight_isp_mode's own hard backstop above) - the -3..-18deg bands
+    # stay on the plain ae_target_mean unchanged, so this doesn't confound
+    # the v48 twilight-handoff fix currently mid-validation there (see
+    # autoexposure.moon_adjusted_target_mean's docstring for why boosting
+    # is safe/wanted here but not in twilight).
+    #
+    # dawn crossing back out of this band: the state file (autoexposure_
+    # state.json) only carries exposure/mean forward, not which target
+    # produced them, so the very next cycle after sun_alt crosses back above
+    # -twilight_isp_backstop_deg computes raw_next off a mean that
+    # converged under the (possibly boosted) true-night target against a
+    # target that just dropped back to plain ae_target_mean - a one-time
+    # ~(ae_target_mean/ae_target_mean_dark_sky) step, same direction/kind as
+    # the saturation guard's existing (much larger) downward cuts. Downward
+    # steps are deliberately uncapped in compute_raw_next - this is not the
+    # v46/v48 bug (an unbounded *upward* extrapolation off a noise-floor
+    # reading that fed back into should_use_isp() every cycle); it's a
+    # single bounded correction that only pushes exposure down, and this
+    # band no longer calls should_use_isp() at all (see the v47 comment
+    # above), so there's no oscillation path back into ISP-driven capture.
+    target_mean = ae_target_mean
+    if exposure_mode == "auto_exposure" and sun_alt <= -ae_twilight_isp_backstop_deg:
+       target_mean = autoexposure.moon_adjusted_target_mean(
+          ae_target_mean, ae_target_mean_dark_sky, data.get("moonAlt"), data.get("moonIllumination"))
+
+    exposure = calculateExposure(sqm, twilight_isp_mode, sun_alt, exposure_min_secs, target_mean)
 
     data["sqm"] = sqm
     data["exposure"] = exposure
@@ -416,9 +469,35 @@ def _run():
        # flag (without touching the capture command / exposure_mode logic
        # above) routes these frames to the exposure-independent NRBR
        # signal instead, same as a real auto_exposure-mode handoff frame.
+       #
+       # twilight_fixed_shutter_band covers a related but distinct case
+       # (found 2026-09-13, real dusk/dawn frames from the v48 band):
+       # cloud_exposure_secs is NOT None there - it's a real, very short
+       # fixed-shutter value (twilight_min_exposure_secs, ~0.02s) - so the
+       # check above doesn't catch it, and it fell through to the night
+       # brightness fallback same as the bug this comment describes.
+       # mean_gray/exposure_secs at that exposure comes out in the
+       # thousands (calibrated night range is ~0.5-7), pegging cloud cover
+       # at 100% on a clear twilight sky, reproduced directly against real
+       # frames (skycam_20260912_20011789236063NTL.jpg,
+       # skycam_20260913_06321789273923NTL.jpg - both visibly clear, both
+       # reported 100%). Originally routed to the same NRBR path as
+       # twilight_isp_mode (2026-09-13 hotfix) - but NRBR is calibrated
+       # against ISP-auto-white-balanced frames, and this band's real
+       # fixed-shutter capture uses the *night* command's fixed
+       # --awbgains (tuned for star color, not daylight balance): on real
+       # frames this produced its own, milder but still real, 20-48%
+       # false-positive on confirmed-clear dawn sky (2026-09-14, see
+       # starscalc.py's CLOUD_TEX_REFERENCE_MEAN/twilight_fixed_shutter_band
+       # texture-only path for the fix and its validation). So
+       # twilight_fixed_shutter_band is now threaded through separately
+       # from cloud_is_isp_driven/twilight_isp_mode instead of folded into
+       # it - it needs its own signal (mean-rescaled texture), not NRBR.
        cloud_is_isp_driven = twilight_isp_mode or (cloud_exposure_secs is None and sun_alt < 0)
        print("calculating stars on: " + jpg_file_name)
-       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs, twilight_isp_mode=cloud_is_isp_driven)
+       sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs,
+                                                 twilight_isp_mode=cloud_is_isp_driven,
+                                                 twilight_fixed_shutter_band=twilight_fixed_shutter_band)
        data["stars"] = sst
        data["clouds"] = scl
 
@@ -502,8 +581,23 @@ def readsqm(daytime=False):
    print("sqm_le = " + str(le))
    return sq, le
 
-def calculateExposure(sq, twilight_isp_mode=False):
-   if sq < 9 and not twilight_isp_mode:
+def calculateExposure(sq, twilight_isp_mode=False, sun_alt=None, min_exposure_secs=None, target_mean=None):
+   if min_exposure_secs is None:
+      min_exposure_secs = ae_min_exposure_secs
+   if target_mean is None:
+      target_mean = ae_target_mean
+
+   # pseudo-SQM/SQM reads bright ("sq<9") during any below-horizon
+   # auto_exposure capture - not just the twilight_isp_mode guard band, but
+   # also the fixed-shutter band between twilight_guard_deg and
+   # twilight_isp_backstop_deg (see _run()) - so sq<9 alone can't mean "no
+   # need to change exposure" there the way it does in full daytime. Real
+   # dusk+dawn data never actually saw sq<9 that deep in the band (sq was
+   # already >=9 right at the -3deg edge), but nothing guarantees that under
+   # every sky/cloud condition, so this stays exposure_mode/sun_alt-driven
+   # rather than relying on that coincidence.
+   below_horizon_auto = exposure_mode == "auto_exposure" and sun_alt is not None and sun_alt < 0
+   if sq < 9 and not below_horizon_auto:
       # no need to change the exposure.
       return 0
 
@@ -517,17 +611,17 @@ def calculateExposure(sq, twilight_isp_mode=False):
    # in the CSV right where the fix needs to be checked.
    sqm_based_ex = exposurecalc.getExposure(sq, esp_secs=esp_secs, appPath=appPath)
    auto_ex = autoexposure.getExposure(sq, esp_secs=esp_secs, appPath=appPath,
-                                       target_mean=ae_target_mean,
-                                       min_exposure_secs=ae_min_exposure_secs,
+                                       target_mean=target_mean,
+                                       min_exposure_secs=min_exposure_secs,
                                        seed_exposure_secs=ae_seed_exposure_secs,
                                        saturation_clip_frac_threshold=ae_saturation_clip_frac_threshold,
                                        saturation_severity_gain=ae_saturation_severity_gain)
 
-   if sq < 9:
-      # twilight_isp_mode only (see guard above) - sq<9 still means "no
-      # need to change exposure" for capture purposes, applied_ex stays 0,
-      # but the comparison row above is worth keeping.
-      logExposureComparison(sq, sqm_based_ex, auto_ex, 0, twilight_isp_mode)
+   if sq < 9 and not below_horizon_auto:
+      # full daytime only (see guard above) - sq<9 still means "no need to
+      # change exposure" for capture purposes, applied_ex stays 0, but the
+      # comparison row above is worth keeping.
+      logExposureComparison(sq, sqm_based_ex, auto_ex, 0, twilight_isp_mode, target_mean)
       return 0
 
    ex = auto_ex if exposure_mode == "auto_exposure" else sqm_based_ex
@@ -541,11 +635,20 @@ def calculateExposure(sq, twilight_isp_mode=False):
    # same way full daytime's is - it's not what --shutter would have used.
    applied_ex = 0 if twilight_isp_mode else min(ex, esp_secs)
 
-   logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode)
+   logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode, target_mean)
 
    return applied_ex
 
-def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode=False):
+def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mode=False, target_mean=None):
+   # target_mean: which target actually drove auto_ex this row - without it,
+   # a given auto_exposure_secs is ambiguous between "old target, darker
+   # sky" and "boosted/moon-scaled target, similar sky", which is exactly
+   # what validating the target_mean_dark_sky boost/moon scaling needs to
+   # tell apart. Appended as a new trailing column, same pattern as
+   # capture_mode's own v47 addition - the header (below) is only ever
+   # written once, so an existing exposure_compare.csv keeps its old header
+   # while new rows carry the extra field; already-existing 6-vs-7-field
+   # parsers need to keep tolerating this.
    csv_path = logFolder + "/exposure_compare.csv"
    file_exists = os.path.exists(csv_path)
    capture_mode = "twilight_isp" if twilight_isp_mode else exposure_mode
@@ -553,8 +656,8 @@ def logExposureComparison(sq, sqm_based_ex, auto_ex, applied_ex, twilight_isp_mo
       with open(csv_path, "a", newline="") as f:
          writer = csv.writer(f)
          if not file_exists:
-            writer.writerow(["timestamp", "sqm", "exposure_mode", "capture_mode", "sqm_based_secs", "auto_exposure_secs", "applied_secs"])
-         writer.writerow([datetime.datetime.now(tz).isoformat(), sq, exposure_mode, capture_mode, sqm_based_ex, auto_ex, applied_ex])
+            writer.writerow(["timestamp", "sqm", "exposure_mode", "capture_mode", "sqm_based_secs", "auto_exposure_secs", "applied_secs", "target_mean"])
+         writer.writerow([datetime.datetime.now(tz).isoformat(), sq, exposure_mode, capture_mode, sqm_based_ex, auto_ex, applied_ex, target_mean])
    except Exception as e:
       print("WARNING: could not write exposure_compare.csv: " + str(e))
 

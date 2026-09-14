@@ -62,17 +62,23 @@ def calculate(dt):
    mySite.elevation = elevation
    mySite.date =  dt_utc
 
-   m=ephem.Moon()
-   m.compute()
-   phase = m.moon_phase
-   a = m.elong
+   sun = ephem.Sun(mySite)
+   moon = ephem.Moon(mySite)
+
+   # bound to mySite (lat/lon/elevation/date) rather than a bare, unbound
+   # ephem.Moon() - the previous code called .compute() with no observer or
+   # date at all, so moon_phase/elong silently used ephem's "right now"
+   # instead of dt/mySite.date. Dormant in practice (this only ever runs
+   # with dt == datetime.now()), but wrong if calculate() is ever called
+   # for another moment (a backfill, a test) - and autoexposure's moon-aware
+   # exposure scaling (see __main__.py) needs this to be genuinely
+   # date-accurate, not coincidentally so.
+   phase = moon.moon_phase
+   a = moon.elong
    mp = 1 - phase
    if a > 0:
        mp = -mp
    print("phase:", phase)
-
-   sun = ephem.Sun(mySite)
-   moon = ephem.Moon(mySite)
 
    moon_setting = ephem.localtime(mySite.next_setting(moon))
    moon_next_new = ephem.localtime(ephem.next_new_moon(mySite.date))
@@ -136,6 +142,13 @@ def calculate(dt):
       "ora": dt.astimezone(mytz).strftime("%H:%M"),
       "isTimelapse": (sf == "YTL" or sf == "NTL"),
       "sunAlt": sunAlt,
+      # numeric moon altitude (degrees, negative below horizon) and
+      # illuminated fraction (0=new, 1=full) - autoexposure's moon-aware
+      # target-mean scaling (see __main__.py/autoexposure.py) needs both as
+      # plain numbers; moonPhase/mp below are display-string/image-shading
+      # values derived from the same "phase", not substitutes for this.
+      "moonAlt": moonAlt,
+      "moonIllumination": phase,
       "suffisso": sf,
       "moonRise": mr,
       "moonSet": ms,

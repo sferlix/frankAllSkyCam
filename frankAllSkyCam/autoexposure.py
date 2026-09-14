@@ -42,6 +42,7 @@
 
 import os
 import json
+import math
 import cv2
 from configparser import ConfigParser
 
@@ -83,8 +84,8 @@ _config.read(fileManager.getConfigFileName())
 SQM_FOLDER = _config.get('sqm', 'sqmFolder', fallback='sqm')
 
 
-def _state_path(appPath):
-    return os.path.join(appPath, SQM_FOLDER, STATE_FILENAME)
+def _state_path(appPath, state_filename=STATE_FILENAME):
+    return os.path.join(appPath, SQM_FOLDER, state_filename)
 
 
 def _measure_roi(gray, roi_percent, clip_pixel_threshold=SATURATION_CLIP_PIXEL_THRESHOLD):
@@ -101,25 +102,31 @@ def _measure_roi(gray, roi_percent, clip_pixel_threshold=SATURATION_CLIP_PIXEL_T
     return mean_val, clip_frac
 
 
-def _write_state(appPath, exposure_secs, mean_val, clip_frac):
+def _write_state(appPath, exposure_secs, mean_val, clip_frac, state_filename=STATE_FILENAME):
     state = {"exposure_secs": float(exposure_secs), "mean": mean_val, "clip_frac": clip_frac}
-    with open(_state_path(appPath), "w") as f:
+    with open(_state_path(appPath, state_filename), "w") as f:
         json.dump(state, f)
 
 
-def recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=70):
+def recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=70, state_filename=STATE_FILENAME):
     '''
     Call right after capture, before drawtext/logos touch the file - this
     measures the raw, unwatermarked frame. A file re-read on a later run
     would already carry the logo/compass/planet/text overlays, which would
     bias the mean, so the measurement never happens that way.
+
+    state_filename: overrides which state file this run's measurement is
+    written to - defaults to the real production state (STATE_FILENAME).
+    Exists so a diagnostic caller (e.g. tools/twilight_shadow_probe.py) can
+    run the exact same feedback math against a separate, parallel state
+    file without ever touching the production one.
     '''
     try:
         gray = cv2.imread(jpg_file_name, cv2.IMREAD_GRAYSCALE)
         if gray is None:
             return
         mean_val, clip_frac = _measure_roi(gray, roi_percent)
-        _write_state(appPath, exposure_secs, mean_val, clip_frac)
+        _write_state(appPath, exposure_secs, mean_val, clip_frac, state_filename)
     except Exception as e:
         print("WARNING: autoexposure.recordExposureResult failed: " + str(e))
 
@@ -197,6 +204,39 @@ def _severity_adjusted_next(raw_next, last_clip_frac, saturation_clip_frac_thres
     return raw_next
 
 
+def moon_adjusted_target_mean(base_target_mean, dark_sky_target_mean, moon_alt_deg, moon_illumination):
+    '''
+    True-night-only target-mean scaling (see __main__.py's ae_target_mean_dark_sky
+    gate - never applied in the twilight bands): with no moon in the sky,
+    the feedback loop should chase dark_sky_target_mean (higher than the
+    historical target_mean default - real deep-night telemetry on this
+    site, 2026-09-12/13, showed the plain target_mean=30 loop settling
+    ~10-15% short of this site's own hand-calibrated sqm_based curve at the
+    same SQM, leaving real headroom below esp_secs unused most of the
+    night) so more faint stars clear the noise floor.
+
+    But a previous frame's own measured mean already reacts to moonlight
+    one cycle late (see module docstring) - it doesn't know moonrise is
+    about to happen. This makes that reaction pre-emptive/continuous
+    instead: moon_factor is 0 (moonless, or moon below the horizon) up to
+    1 (a full moon at zenith), so the target smoothly falls back toward the
+    old, more conservative base_target_mean exactly when a brighter moon
+    would make chasing the higher target pointless - moonglow raises the
+    sky background regardless of shutter length, so a longer exposure
+    there buys no extra faint-star SNR, only more read noise/trailing and a
+    higher chance of a moon-glow halo tripping the saturation guard.
+
+    moon_illumination: 0 (new) - 1 (full), e.g. calculateEphem's "phase".
+    moon_alt_deg: degrees above horizon (negative = below - contributes 0,
+    via max(0, sin(...)) rather than going negative and overshooting past
+    dark_sky_target_mean).
+    '''
+    if moon_alt_deg is None or moon_illumination is None:
+        return dark_sky_target_mean
+    moon_factor = max(0.0, math.sin(math.radians(moon_alt_deg))) * max(0.0, min(1.0, moon_illumination))
+    return dark_sky_target_mean + (base_target_mean - dark_sky_target_mean) * moon_factor
+
+
 def should_use_isp(appPath, target_mean, min_exposure_secs,
                     saturation_clip_frac_threshold=0.05, saturation_severity_gain=8.0):
     '''
@@ -236,7 +276,8 @@ def should_use_isp(appPath, target_mean, min_exposure_secs,
 
 def getExposure(sq, esp_secs=None, appPath=None, target_mean=30.0,
                  min_exposure_secs=1.0, seed_exposure_secs=5.0,
-                 saturation_clip_frac_threshold=0.05, saturation_severity_gain=8.0):
+                 saturation_clip_frac_threshold=0.05, saturation_severity_gain=8.0,
+                 state_filename=STATE_FILENAME):
     '''
     sq (SQM) is accepted for interface parity with exposurecalc.getExposure
     but not used here - this mode tracks the previous frame's own measured
@@ -246,9 +287,12 @@ def getExposure(sq, esp_secs=None, appPath=None, target_mean=30.0,
     time this runs, raw_next is expected to already be at or above
     min_exposure_secs, so that floor should rarely bind here; it stays as
     a defensive backstop, not the thing doing the real clamping.
+
+    state_filename: see recordExposureResult - lets a diagnostic caller
+    run this same math against a separate state file.
     '''
     try:
-        with open(_state_path(appPath), "r") as f:
+        with open(_state_path(appPath, state_filename), "r") as f:
             state = json.load(f)
         last_exposure = float(state["exposure_secs"])
         last_mean = float(state["mean"])

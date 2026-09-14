@@ -118,6 +118,18 @@ CLOUD_TEX_HIGH = 14.0            # calibrated structured-cloud texture std
 CLOUD_BRIGHTNESS_LOW = 33.0      # calibrated clear-sky mean gray (no exposure normalization)
 CLOUD_BRIGHTNESS_HIGH = 50.0     # calibrated overcast mean gray
 
+CLOUD_TEX_REFERENCE_MEAN = 30.0  # the ROI mean brightness CLOUD_TEX_LOW/HIGH were calibrated
+                                  # against (same historical target_mean=30 baseline as
+                                  # HAZE_SPREAD_REFERENCE_MEAN) - see
+                                  # _estimate_cloud_cover_texture_only's mean-rescaling: tex_std
+                                  # is a raw pixel-value std, not exposure/brightness-normalized,
+                                  # so it scales with whatever absolute brightness the frame
+                                  # happens to sit at. Confirmed on a real frame (2026-09-14,
+                                  # dusk 09-12 20:01, roi_mean 70.6): unscaled tex_std=10.87 would
+                                  # peg texture_score near 64% on a frame independently confirmed
+                                  # clear (NRBR=0.0 on the same frame) - rescaled by 30/70.6 it
+                                  # drops to 4.62, correctly below CLOUD_TEX_LOW.
+
 DAY_NRBR_CLEAR = 0.40            # calibrated clear-blue-sky NRBR (zenith measured ~0.53, margin
                                   # kept for natural whitening toward the horizon under clear sky)
 DAY_NRBR_CLOUD = 0.12            # calibrated white/gray NRBR (measured on Sun-flare/near-white
@@ -144,15 +156,41 @@ DAY_NRBR_AGG_PERCENTILE = 40     # a single DAY_NRBR_CLEAR margin isn't enough o
 
 HAZE_BG_SIGMA = 120              # heavy enough to discard both star-scale and cloud-scale
                                   # ("texture") content, keeping only the broadest glow structure
-HAZE_SPREAD_LOW = 6.0            # calibrated clear-sky p90-p10 spread of that broad background
-                                  # (max observed 5.6 across 3 real clear-sky reference captures)
-HAZE_SPREAD_HIGH = 14.0          # calibrated patchy-cloud/moon-behind-cloud spread (10.6-12.6
-                                  # observed on real partly-cloudy and moon-behind-cloud captures) -
+HAZE_SPREAD_LOW = 11.0           # revised 2026-09-10 from the original 6.0 (max observed 5.6 across
+                                  # only 3 real clear-sky captures - too small a sample, see below).
+                                  # A same-day retrospective scan of 36 real deep-night frames across
+                                  # 3 full nights (84.33.110.109) found the original 6.0 produced a
+                                  # recurring false-positive floor on two entirely clear nights - full-
+                                  # ROI spread sat at 4.2-10.52 all night on both (only the horizon
+                                  # ring: this site's own light-pollution glow, not cloud - a zenith-
+                                  # only inner-ROI check on the same frames stayed under 6.0 the whole
+                                  # time), which the old constant reported as up to 56.5% cloud on an
+                                  # ordinary clear night. 11.0 sits just above that real clear-night
+                                  # ceiling, fully eliminating it (verified: 0% ceiling across both
+                                  # clear nights, vs. 13% residual at 10.0). Real cost, not free: a
+                                  # genuinely foggy night sampled the same round (independently
+                                  # confirmed via visual review - 5-6 stars only, matches production's
+                                  # own 86%/100% reports that night) had two readings whose spread
+                                  # (9.03, 9.81) falls in the same overlap band as the clear-night
+                                  # ceiling - those now read ~0% instead of 38-48%. The same fog episode
+                                  # still registers at 100% three separate times (01:00, 02:20, 03:40),
+                                  # so the event as a whole is still caught - this is reduced within-
+                                  # event granularity on 2 of 10 sampled readings, not a missed event.
+                                  # Chosen over 10.0 because the user's explicit priority is eliminating
+                                  # night-side false positives entirely, not minimizing this cost.
+                                  # Revisit with more reference nights before pushing this further.
+HAZE_SPREAD_HIGH = 14.0          # unchanged - calibrated patchy-cloud/moon-behind-cloud spread (10.6-
+                                  # 12.6 observed on real partly-cloudy and moon-behind-cloud captures) -
                                   # small reference set (6 real images); revisit if false-flagging
                                   # a genuinely clear night, or missing an actually hazy one
+HAZE_SPREAD_REFERENCE_MEAN = 30.0  # the ROI mean brightness both constants above were calibrated
+                                  # against (autoexposure.py's own historical target_mean default) -
+                                  # see _estimate_cloud_cover_haze's mean-rescaling for why this
+                                  # matters: this signal is an absolute pixel-value spread, not
+                                  # exposure-normalized like _estimate_cloud_cover's radiance rate.
 
 
-def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False):
+def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False, twilight_fixed_shutter_band=False):
     """
     Analizza il cielo notturno per contare le stelle e stimare la copertura nuvolosa.
 
@@ -163,12 +201,35 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     - min_contrasto: soglia minima di intensita' per distinguere una stella dal rumore
     - exposure_secs: durata di esposizione applicata (se nota); migliora la stima
       delle nuvole. Se omesso, si tenta l'EXIF del file e infine un fallback
-      basato solo su luminosita'/texture. Ignorato se twilight_isp_mode=True.
+      basato solo su luminosita'/texture. Ignorato se twilight_isp_mode=True o
+      twilight_fixed_shutter_band=True.
     - twilight_isp_mode: True se lo scatto e' stato esposto dall'ISP (twilight
       handoff) anziche' con uno shutter fisso/predetto - in tal caso la
       luminosita' e' normalizzata dall'ISP stesso e non e' informativa per le
       nuvole (stesso motivo per cui il branch diurno usa NRBR invece della
       luminosita'), quindi la copertura nuvolosa usa NRBR anche di notte.
+    - twilight_fixed_shutter_band: True se lo scatto e' un vero scatto a
+      shutter fisso (non ISP) ma comunque nella fascia crepuscolare (fra
+      twilight_guard_deg e twilight_isp_backstop_deg) - qui l'esposizione e'
+      reale ma troppo breve (~0.02s) per il segnale radiance-rate notturno
+      (calibrato su esposizioni multi-secondo), e NRBR non e' applicabile
+      perche' questo frame usa il bilanciamento del bianco fisso notturno
+      (--awbgains), non quello automatico diurno su cui NRBR e' calibrato
+      (vedi CLOUD_TEX_REFERENCE_MEAN e _estimate_cloud_cover_texture_only).
+      Ha priorita' su twilight_isp_mode se entrambi fossero True (non
+      dovrebbe succedere nella pratica: sono impostati in rami alternativi
+      di __main__.py). NB: `gray[roi==255].mean() > DAYTIME_MEAN_THRESHOLD`
+      is checked before this parameter is ever consulted (see below) - if a
+      real frame in this band ever crossed that threshold it would silently
+      take the day path (NRBR) instead, reviving the false-positive this
+      parameter exists to fix. Checked against a real full dusk+dawn dataset
+      (86 frames, 2026-09-14, sun_alt computed per-frame): ROI mean stays
+      30-69 throughout the genuine -twilight_isp_backstop_deg..
+      -twilight_guard_deg band on both crossings (peaking at 68.73 right at
+      the -3deg edge itself), comfortably under DAYTIME_MEAN_THRESHOLD=85 -
+      not observed as a live problem, but the margin (~16 points) is real
+      data, not a guarantee; revisit if a future report shows this band
+      silently reading day-branch values.
 
     OUTPUT:
     - star_count: numero di stelle rilevate
@@ -199,7 +260,9 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     sky_eroded = _erode_guard_band(sky)
 
     star_count = _find_stars(gray, sky_eroded, min_contrasto, sensibilita)
-    if twilight_isp_mode:
+    if twilight_fixed_shutter_band:
+        cloud_cover = _estimate_cloud_cover_texture_only(gray, sky_eroded)
+    elif twilight_isp_mode:
         cloud_cover = _estimate_cloud_cover_nrbr(img, sky_eroded)
     else:
         cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs)
@@ -257,6 +320,84 @@ def _estimate_cloud_cover_nrbr(img, sky_mask):
     score = np.clip((DAY_NRBR_CLEAR - sky_nrbr) / (DAY_NRBR_CLEAR - DAY_NRBR_CLOUD), 0, 1)
     # percentile, not mean - see DAY_NRBR_AGG_PERCENTILE
     return round(100.0 * np.percentile(score, DAY_NRBR_AGG_PERCENTILE), 1)
+
+
+def _estimate_cloud_cover_texture_only(gray, sky_mask):
+    '''
+    Twilight-fixed-shutter-band signal (real fixed shutter, ~0.02s floor,
+    night --awbgains) - found 2026-09-14 after the 2026-09-13 NRBR-routing
+    hotfix for this band (see __main__.py's twilight_fixed_shutter_band
+    comment) turned out to have its own 20-48% false-positive on confirmed-
+    clear dawn sky: NRBR's DAY_NRBR_CLEAR/CLOUD anchors are calibrated
+    against ISP-auto-white-balanced frames (daytime and twilight_isp_mode),
+    but this band's real fixed-shutter capture uses the night command's
+    fixed --awbgains (tuned for accurate star color, not daylight balance) -
+    a manual white balance NRBR was never validated against, and measured
+    real NRBR here (~0.24-0.33) sits well below the "genuinely clear" anchor
+    despite the sky being genuinely clear.
+
+    Uses the same band-pass texture std as _estimate_cloud_cover's
+    texture_score (CLOUD_TEX_LOW/HIGH), but WITHOUT that function's
+    brightness_signal (radiance-rate, mean_gray/exposure_secs) - that's the
+    signal that pegs to 100% at this band's sub-second exposures in the
+    first place (calibrated for multi-second night exposures, see the
+    2026-09-13/v38 history in memory), so it can't be reused here even
+    partially via max(). Also deliberately does NOT stack the haze signal
+    (_estimate_cloud_cover_haze) - HAZE_SPREAD_LOW/HIGH are deep-night-only
+    calibrated and unvalidated at this band's brightness/exposure, and
+    stacking a second unvalidated signal on top of this one would confound
+    which one is responsible for a bad reading.
+
+    Rescaled by CLOUD_TEX_REFERENCE_MEAN/actual ROI mean, same reason and
+    same technique as _estimate_cloud_cover_haze's own mean-rescaling: raw
+    tex_std is an absolute pixel-value std, not exposure-normalized, so it
+    scales with whatever brightness this band's fixed-shutter feedback loop
+    happens to be converging on at that moment (unlike NRBR, a ratio that's
+    scale-invariant by construction) - see CLOUD_TEX_REFERENCE_MEAN's own
+    comment for the real frame that would have false-positived without it.
+
+    Validated (2026-09-14) against a first 6-frame sample in this band, all
+    independently confirmed clear (visual + matching NRBR=0 where NRBR
+    itself was correct): all 6 read 0% (below CLOUD_TEX_LOW) after
+    rescaling, including the two where NRBR was wrong (05:20/05:30 dawn
+    today, NRBR 45.5%/19.5%, this signal 0%/0%) and the one where raw
+    (unrescaled) tex_std would itself have been wrong (dusk 09-12 20:01,
+    roi_mean 70.6, raw tex_std 10.87 -> ~64%, rescaled -> 4.62 -> 0%).
+
+    Broader same-day check (86 real frames, full dusk+dawn crossing,
+    sun_alt computed per real frame timestamp) found this is NOT a clean
+    0% everywhere in the band: 06:15-06:39 dawn (sun_alt -8.70 to -3.14,
+    still confirmed clear) read a small non-zero residual, 0.6% rising to
+    4.8% and decaying back to 0 - real, not sampled by the smaller probe
+    above. A large improvement on the 20-48% NRBR false-positive this
+    replaces, but NOT literal zero everywhere, unlike HAZE_SPREAD_LOW's own
+    validated ceiling (0% residual, the bar the user has held this class of
+    fix to before). No real cloudy-twilight-band reference frame exists
+    yet, so real-cloud sensitivity in this specific band is UNVERIFIED -
+    revisit once the reference collectors
+    (tools/*_cloud_reference_collector.py) accumulate a real cloudy sample
+    in this band.
+
+    Known limitation (found via unit testing, not yet seen live): unlike
+    _estimate_cloud_cover_haze's rescaling (which corrects for a globally,
+    separately-caused exposure/target_mean shift), this rescale divides by
+    the mean of the SAME masked region the texture is measured over - so a
+    real cloud patch that is both large AND much brighter than the rest of
+    the frame (plausible for light-pollution-lit cloud at night) inflates
+    its own reference mean and damps its own score, biasing this signal
+    toward under-reporting exactly that case. Not fixed here - would need a
+    real bright-patch-at-night twilight-band reference frame to calibrate
+    against, which doesn't exist yet either; flagged for whoever reviews
+    this once real cloudy data lands.
+    '''
+    small = cv2.GaussianBlur(gray, (0, 0), sigmaX=CLOUD_TEX_SMALL_SIGMA)
+    large = cv2.GaussianBlur(gray, (0, 0), sigmaX=CLOUD_TEX_LARGE_SIGMA)
+    texture = small.astype(np.float64) - large.astype(np.float64)
+    tex_std = texture[sky_mask == 255].std()
+    mean_val = gray[sky_mask == 255].mean()
+    if mean_val > 0:
+        tex_std = tex_std * (CLOUD_TEX_REFERENCE_MEAN / mean_val)
+    return round(100.0 * _clip01((tex_std - CLOUD_TEX_LOW) / (CLOUD_TEX_HIGH - CLOUD_TEX_LOW)), 1)
 
 
 def _erode_guard_band(sky):
@@ -528,13 +669,40 @@ def _estimate_cloud_cover_haze(gray, sky_mask):
     scale is itself an even larger confound: 23.5 on a real clear+Moon
     reference, higher than any real cloud case measured).
 
-    Calibrated on 6 real images total (3 clear, 3 cloudy/hazy) - the
-    smallest reference set of any signal in this module. Revisit
-    HAZE_SPREAD_LOW/HIGH if this over- or under-reports in practice.
+    Originally calibrated on 6 real images total (3 clear, 3 cloudy/hazy) -
+    the smallest reference set of any signal in this module, and it showed:
+    a 2026-09-10 retrospective scan of 36 real frames across 3 full nights
+    found the original HAZE_SPREAD_LOW produced a recurring false-positive
+    floor (up to 56.5% reported) on two entirely clear nights, driven by
+    this site's own horizon light-pollution glow rather than cloud - see
+    HAZE_SPREAD_LOW's own comment for the full real-frame evidence and the
+    revised value's trade-off. Revisit again once the night-side reference
+    collector (tools/night_cloud_reference_collector.py) has accumulated
+    more labeled real nights.
+
+    Rescaled by HAZE_SPREAD_REFERENCE_MEAN/actual ROI mean - unlike
+    _estimate_cloud_cover's radiance rate (mean/exposure, already
+    exposure-normalized), this is a raw pixel-value spread, so it scales
+    with whatever absolute brightness autoexposure's feedback loop happens
+    to be converging on. That was a constant (target_mean=30) for the
+    entire real dataset this signal was calibrated and validated against,
+    so it was invisible until autoexposure gained a true-night target-mean
+    boost/moon-scaling (target_mean now 30-35+ depending on the Moon):
+    confirmed on a real 2026-09-13 frame (mean_gray 35.09, 76 stars still
+    visible, a barely-hazy sky) that the unscaled spread (14.648) pegged
+    this signal at 100% - rescaled by 30/35.09, it drops to 12.52 -> 50.8%,
+    matching the same night's own visual estimate (~50%). Every other real
+    reference row on file (all captured before that boost existed, at the
+    old fixed target_mean=30) shifts by under half a point under this
+    rescaling - it's a no-op on the exact dataset HAZE_SPREAD_LOW/HIGH were
+    validated against, and only corrects the new target_mean-driven cases.
     '''
     bg = cv2.GaussianBlur(gray.astype(np.float64), (0, 0), sigmaX=HAZE_BG_SIGMA)
     vals = bg[sky_mask == 255]
     spread = np.percentile(vals, 90) - np.percentile(vals, 10)
+    mean_val = vals.mean()
+    if mean_val > 0:
+        spread = spread * (HAZE_SPREAD_REFERENCE_MEAN / mean_val)
     return _clip01((spread - HAZE_SPREAD_LOW) / (HAZE_SPREAD_HIGH - HAZE_SPREAD_LOW))
 
 

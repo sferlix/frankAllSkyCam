@@ -76,6 +76,45 @@ def test_compute_raw_next_does_not_cap_downward_steps():
     assert result == pytest.approx(1.0 * (30.0 / 229.0))
 
 
+# ---- moon_adjusted_target_mean (true-night target boost) ---------------
+
+def test_moon_adjusted_target_mean_full_boost_when_moon_below_horizon():
+    # Moon below the horizon - full boost regardless of illumination
+    result = autoexposure.moon_adjusted_target_mean(
+        base_target_mean=30.0, dark_sky_target_mean=35.0, moon_alt_deg=-10.0, moon_illumination=1.0)
+    assert result == pytest.approx(35.0)
+
+
+def test_moon_adjusted_target_mean_full_boost_when_moon_new():
+    # Moon above the horizon but new (0 illumination) - full boost
+    result = autoexposure.moon_adjusted_target_mean(
+        base_target_mean=30.0, dark_sky_target_mean=35.0, moon_alt_deg=45.0, moon_illumination=0.0)
+    assert result == pytest.approx(35.0)
+
+
+def test_moon_adjusted_target_mean_falls_back_to_base_at_full_moon_zenith():
+    # full moon straight overhead - sin(90deg)=1, illumination=1 -> no boost
+    # at all, falls all the way back to the old, conservative target
+    result = autoexposure.moon_adjusted_target_mean(
+        base_target_mean=30.0, dark_sky_target_mean=35.0, moon_alt_deg=90.0, moon_illumination=1.0)
+    assert result == pytest.approx(30.0)
+
+
+def test_moon_adjusted_target_mean_interpolates_partway():
+    # half-illuminated moon at 30deg altitude: moon_factor = sin(30deg)*0.5 = 0.25
+    result = autoexposure.moon_adjusted_target_mean(
+        base_target_mean=30.0, dark_sky_target_mean=35.0, moon_alt_deg=30.0, moon_illumination=0.5)
+    assert result == pytest.approx(35.0 + (30.0 - 35.0) * 0.25)
+
+
+def test_moon_adjusted_target_mean_defaults_to_boost_when_moon_data_missing():
+    # calculateEphem couldn't supply moon data - safest is still the boost,
+    # not silently reverting to the conservative value for an unrelated reason
+    result = autoexposure.moon_adjusted_target_mean(
+        base_target_mean=30.0, dark_sky_target_mean=35.0, moon_alt_deg=None, moon_illumination=None)
+    assert result == pytest.approx(35.0)
+
+
 # ---- should_use_isp (the twilight crossover test) ----------------------
 
 def test_should_use_isp_true_when_no_state_file(appPath):
