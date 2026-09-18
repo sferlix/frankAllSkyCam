@@ -63,7 +63,7 @@ def getConfigFileName():
     htmlFile = homePath + "/frankAllSkyCam/index.html"
     sqmExpCsv= homePath + "/frankAllSkyCam/sqmexp.csv"
     moonFile = homePath + "/frankAllSkyCam/png/moon.png"
-    logoFile = homePath + "/frankAllSkyCam/png/logo.png"
+    logoFile = homePath + "/frankAllSkyCam/png/frankAllSkyCamLogo.png"
     compFile = homePath + "/frankAllSkyCam/png/compass.png"
     phaseFile= homePath + "/frankAllSkyCam/png/phase.png"
     jupiterFile= homePath + "/frankAllSkyCam/png/jupiter.png"
@@ -84,7 +84,7 @@ def getConfigFileName():
     checkFile(htmlFile, "/defaults/tools/index.html")
     checkFile(sqmExpCsv, "/defaults/sqmexp.csv")
     checkFile(moonFile, "/defaults/png/moon.png")
-    checkFile(logoFile, "/defaults/png/logo.png")
+    checkFile(logoFile, "/defaults/png/frankAllSkyCamLogo.png")
     checkFile(compFile, "/defaults/png/compass.png")
     checkFile(jupiterFile, "/defaults/png/jupiter.png")
     checkFile(marsFile, "/defaults/png/mars.png")

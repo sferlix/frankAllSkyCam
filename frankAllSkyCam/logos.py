@@ -58,7 +58,7 @@ def main():
     jpg_filename = homePath +  "skycam.jpg"
 
     imagePaste(jpg_filename, "compass.png",900,580,20)
-    imagePaste(jpg_filename, "logo.png",30,580,0)
+    imagePaste(jpg_filename, "frankAllSkyCamLogo.png",30,580,0)
     imagePaste(jpg_filename, "phase.png",900,300,0)
     return
 

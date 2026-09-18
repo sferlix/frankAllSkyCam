@@ -152,7 +152,7 @@ compass_rot_angle = 0
 # relative path from frankAllSkyCam/png
 # if file not found, it will be skipped
 # set your coords according to your resolution
-logo_filename = logo.png
+logo_filename = frankAllSkyCamLogo.png
 logo_x_pos = 30
 logo_y_pos = 610
 
