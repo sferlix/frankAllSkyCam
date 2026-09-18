@@ -11,6 +11,7 @@ from frankAllSkyCam import fileManager
 import sys
 import math
 import os
+import subprocess
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
 import socket
@@ -174,6 +175,78 @@ def readCrontab():
     file1.close()
     os.system("rm ./prev_crontab.txt")
     return crontabLines
+
+
+# substrings identifying the specific cron lines a long-running exclusive-
+# camera-access operation (e.g. capturedarks.py) needs paused - deliberately
+# narrower than MARKER alone, which also tags jobs safe to leave running
+# (allskycamdelete, startrail, timelapse, calculateEphem, generateExtraData):
+#   - the regular capture job itself ("python3 -m frankAllSkyCam >", note the
+#     trailing " >" so this doesn't also match "-m frankAllSkyCam.watchDog"
+#     etc. below) - would otherwise race the foreground operation for the
+#     camera
+#   - the watchdog ("-m frankAllSkyCam.watchDog") - reboots the Pi if no new
+#     frame has appeared within config.txt's rebootAfter minutes (15 by
+#     default); a real capturedarks.py session (multiple exposures x
+#     multiple frames each, some up to a minute long) can run close to or
+#     past that with the regular capture job paused, so the watchdog itself
+#     must be paused too, not just outlasted
+PAUSABLE_JOB_SUBSTRINGS = ("python3 -m frankAllSkyCam >", "-m frankAllSkyCam.watchDog")
+
+
+def _currentCrontabLines():
+    '''Returns the current real crontab as a list of lines, or [] if none is installed yet.'''
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    if result.returncode != 0:
+        return []
+    return result.stdout.splitlines(keepends=True)
+
+
+def _installCrontabLines(lines):
+    # same "write to a temp file, then `crontab <file>`" pattern getTimes()
+    # itself uses (see its own comment above) - crontab refuses a malformed
+    # file as a whole rather than applying it partially, so this fails safe
+    tmp_path = appPath + "_tmp_crontab_install.txt"
+    with open(tmp_path, "w") as f:
+        f.writelines(lines)
+    os.system("crontab " + tmp_path)
+    os.remove(tmp_path)
+
+
+def _pausedLines(lines):
+    '''
+    Pure transform: comments out (never deletes) any line matching
+    PAUSABLE_JOB_SUBSTRINGS, leaves every other line - including one that's
+    already commented out - untouched. Split out from pauseCaptureJobs()
+    purely so this selection logic can be unit tested without a real
+    crontab.
+    '''
+    return [
+        "#" + line if (not line.startswith("#") and
+                        any(s in line for s in PAUSABLE_JOB_SUBSTRINGS))
+        else line
+        for line in lines
+    ]
+
+
+def pauseCaptureJobs():
+    '''
+    Comments out (never deletes) this install's regular capture + watchdog
+    cron lines - see PAUSABLE_JOB_SUBSTRINGS for exactly which and why.
+    Every other scheduled job (startrail, timelapse, cleanup, ...) is left
+    running untouched. Returns the exact original crontab lines (not just
+    the paused ones), so the caller can restore the real prior state
+    verbatim afterward regardless of what else was going on - pass this
+    straight to resumeCaptureJobs() when done, in a finally block.
+    '''
+    original = _currentCrontabLines()
+    _installCrontabLines(_pausedLines(original))
+    return original
+
+
+def resumeCaptureJobs(original_lines):
+    '''Restores the exact crontab lines a prior pauseCaptureJobs() call returned.'''
+    _installCrontabLines(original_lines)
 
 
 def main():

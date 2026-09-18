@@ -203,6 +203,27 @@ Requires at least 5 real night captures already in `~/frankAllSkyCam/img/<YYYYMM
 
 Re-run the command any time your site's fixed obstructions change (a tree grows, something new gets mounted near the camera). Entirely optional - skip it if the default dynamic detection already works well for your site.
 
+## 7. (Optional) Correct hot pixels and dark current
+
+Every real sensor has a handful of individual defective photosites ("hot pixels") that show up as fixed bright dots in every long night exposure, plus a small amount of diffuse dark current. Two independent, optional corrections are available - both are opt-in (no config needed) and run automatically, before star/cloud detection and the watermark, on every night capture once set up:
+
+**Dark frame subtraction** (the more thorough option) - captures real dark frames with the lens covered and subtracts them from every night frame, cancelling the whole per-pixel dark signal rather than just known coordinates:
+
+```
+python -m frankAllSkyCam.capturedarks
+```
+
+Run this **with the lens/dome physically covered** - this camera has no shutter, so it can't be automated mid-sequence; the tool prompts you and waits. It captures 5 exposures (5, 15, 30, 45, 60 seconds) x 5 frames each, averaged into one master dark per exposure (averaging reduces the dark frames' own noise without affecting the fixed pattern they're meant to cancel), and saves the result to `~/frankAllSkyCam/darks/`. It also pauses your regular capture schedule and the watchdog for the duration (both are automatically restored afterward, even if the tool is interrupted) so nothing races it for the camera or reboots the Pi mid-session. Re-run it whenever `additional_night_params`, `night_mode`, `night_sharpness`, or `night_contrast` change in `config.txt` - a stale library (captured under different settings) is automatically detected and ignored rather than silently misapplied.
+
+**Hot-pixel coordinate correction** (cheaper fallback, used automatically only if no dark library is present) - corrects a fixed list of known defective pixel coordinates without needing to cover the lens:
+
+```
+python -m frankAllSkyCam.calibratehotpixels <folder-of-your-own-night-jpgs> --out hotpixels.json
+```
+then move `hotpixels.json` into `~/frankAllSkyCam/`. It finds pixel positions that recur at the exact same coordinate across several of your own archived night frames (`~/frankAllSkyCam/img/<date>/`, at least 5) - real stars drift slightly night to night, fixed sensor defects don't. Add `--layout <name>` if you have a preset exclusion mask for your own watermark layout (keeps text/logo edges from being miscounted as recurring defects); omit it and it just won't exclude any region. Coordinates are specific to one physical sensor - never copy `hotpixels.json` between installs.
+
+Both are entirely optional - frankAllSkyCam works fine without either.
+
 ---
 
 ## Extra sensors, weather stations, and the dew heater
