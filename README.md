@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/logo.png" alt="frankAllSkyCam logo" width="120">
+</p>
+
 # frankAllSkyCam
 
 Open-source AllSky camera software for a **Raspberry Pi + Pi HQ Camera** (or compatible libcamera sensor) with a fisheye lens. Point it at the sky, run it on a cron schedule, and it takes care of the rest:
