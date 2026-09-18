@@ -97,6 +97,17 @@ def getConfigFileName():
 
     return fileName
 
+def getStaticMaskFileName():
+    # No seeding via checkFile() - unlike every other path in
+    # getConfigFileName(), there is no package-shipped default to fall back
+    # to: this file is generated per-site by the user's own
+    # generate_mask.py CLI tool (see staticmask.py). Absence is a normal,
+    # expected state (fresh install, or before the user has run the tool
+    # yet) - callers must treat a missing file as "not generated yet", not
+    # as an error.
+    homePath = os.path.expanduser("~")
+    return homePath + "/frankAllSkyCam/static_mask.png"
+
 def checkFile(destFileName, sourceFileName):
     if not os.path.isfile(destFileName):
        # ensure the destination's directory exists - matters for files seeded

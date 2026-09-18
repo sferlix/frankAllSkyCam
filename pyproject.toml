@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "frankAllSkyCam"
-version = "50"
+version = "51"
 description = "AllSky camera software for Raspberry Pi + Pi HQ Camera: automated capture, watermarking, timelapses, startrails, and day/night cloud & star detection."
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
@@ -37,6 +37,9 @@ dependencies = [
 Homepage = "https://github.com/sferlix/frankAllSkyCam"
 Repository = "https://github.com/sferlix/frankAllSkyCam"
 Issues = "https://github.com/sferlix/frankAllSkyCam/issues"
+
+[project.scripts]
+frankallskycam-generate-mask = "frankAllSkyCam.generate_mask:main"
 
 [tool.setuptools]
 packages = ["frankAllSkyCam"]

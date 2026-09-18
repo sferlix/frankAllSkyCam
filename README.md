@@ -191,6 +191,18 @@ Every job's output goes to its own log file under `~/frankAllSkyCam/log/`, so if
 
 ### Enjoy it!
 
+## 6. (Optional) Generate a static obstruction mask
+
+By default, frankAllSkyCam detects foreground obstructions (trees, roof edges, antennas) dynamically on every frame - works out of the box, but can occasionally misjudge on tricky lighting. Once your camera has been running for a few nights, you can instead generate a static, site-specific mask from your own real footage:
+
+```
+frankallskycam-generate-mask
+```
+
+Requires at least 5 real night captures already in `~/frankAllSkyCam/img/<YYYYMMDD>/`. It scans your recent night frames, derives a mask of whatever's consistently obstructed, and saves it to `~/frankAllSkyCam/static_mask.png` (backing up any existing mask first) along with a preview overlay at `~/frankAllSkyCam/static_mask_preview.png` - **review the preview before trusting the mask**, since it highlights in yellow exactly what will be excluded from every future analysis. Once a mask is present, frankAllSkyCam uses it automatically instead of the dynamic per-frame detection; delete `static_mask.png` (or restore the `.bak` this tool saves) to fall back to dynamic detection again.
+
+Re-run the command any time your site's fixed obstructions change (a tree grows, something new gets mounted near the camera). Entirely optional - skip it if the default dynamic detection already works well for your site.
+
 ---
 
 ## Extra sensors, weather stations, and the dew heater

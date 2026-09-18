@@ -56,6 +56,8 @@ import cv2
 import numpy as np
 import math
 
+from frankAllSkyCam import fileManager, staticmask
+
 try:
     from PIL import Image, ExifTags
 except ImportError:
@@ -256,8 +258,8 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     if gray[roi == 255].mean() > DAYTIME_MEAN_THRESHOLD:
         return _analyze_day(img, gray, roi)
 
-    obstruction = _obstruction_mask(gray, roi)
-    bright_source, source_found = _bright_source_mask(gray, roi)
+    obstruction = _get_obstruction_mask(gray, roi, is_night=True)
+    bright_source, source_found, _ = _bright_source_mask(gray, roi)
 
     sky = roi.copy()
     sky[obstruction == 255] = 0
@@ -295,8 +297,8 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
 
 
 def _analyze_day(img, gray, roi):
-    sun_mask, sun_found = _bright_source_mask(gray, roi)
-    obstruction = _day_obstruction_mask(gray, roi)
+    sun_mask, sun_found, _ = _bright_source_mask(gray, roi)
+    obstruction = _get_obstruction_mask(gray, roi, is_night=False)
 
     sky = roi.copy()
     sky[sun_mask == 255] = 0
@@ -429,6 +431,31 @@ def roi_mask(gray, ratio):
     return mask
 
 
+def _get_obstruction_mask(gray, roi, is_night, mask_path=None):
+    '''
+    Prefers the auto-generated static mask (see staticmask.py,
+    generate_mask.py) when one exists and matches this frame's shape; falls
+    back to the existing dynamic heuristic (_obstruction_mask at night,
+    _day_obstruction_mask during the day) otherwise - a fresh install with
+    no generated mask yet behaves exactly as it did before this function
+    existed.
+
+    mask_path: overridable for tests (see autoexposure.py's state_filename
+    parameter for the same pattern/reason) - defaults to the real
+    production path.
+    '''
+    if mask_path is None:
+        mask_path = fileManager.getStaticMaskFileName()
+
+    static = staticmask.get_static_mask(gray.shape, mask_path)
+    if static is not None:
+        return static
+
+    if is_night:
+        return _obstruction_mask(gray, roi)
+    return _day_obstruction_mask(gray, roi)
+
+
 def _obstruction_mask(gray, roi):
     # foreground obstructions (trees, structures) are unlit and read near-black,
     # unlike sky background which always retains some floor from airglow/light
@@ -449,12 +476,19 @@ def _bright_source_mask(gray, roi):
     # the Sun or Moon (or any other dominant bright source: a bright planet, a
     # stray light) shows up as a large near-saturated blob; mask it plus a
     # generous halo so its flare and diffraction spikes can't be miscounted as
-    # stars (night) or read as white/cloud-like via NRBR (day)
+    # stars (night) or read as white/cloud-like via NRBR (day). Also returns
+    # the largest qualifying blob's centroid (the real sun/moon, not a
+    # smaller artifact) - needed by tools/skycalibration_collector.py for
+    # sky-projection calibration (see
+    # docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md
+    # section 5); None when nothing was found.
     candidate = ((gray > BRIGHT_SOURCE_GRAY_MIN) & (roi == 255)).astype(np.uint8) * 255
     n, labels, stats, centroids = cv2.connectedComponentsWithStats(candidate, connectivity=8)
     roi_area = np.sum(roi == 255)
     out = np.zeros_like(candidate)
     found = False
+    largest_area = 0
+    largest_centroid = None
     for i in range(1, n):
         area = stats[i, cv2.CC_STAT_AREA]
         if area > BRIGHT_SOURCE_MIN_AREA_FRAC * roi_area:
@@ -462,7 +496,10 @@ def _bright_source_mask(gray, roi):
             cx, cy = centroids[i]
             r = int(math.sqrt(area / math.pi) * BRIGHT_SOURCE_HALO_FACTOR) + BRIGHT_SOURCE_HALO_MARGIN
             cv2.circle(out, (int(cx), int(cy)), r, 255, -1)
-    return out, found
+            if area > largest_area:
+                largest_area = area
+                largest_centroid = (float(cx), float(cy))
+    return out, found, largest_centroid
 
 
 def _day_obstruction_mask(gray, roi):
