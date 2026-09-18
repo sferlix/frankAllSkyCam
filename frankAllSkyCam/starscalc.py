@@ -189,6 +189,16 @@ HAZE_SPREAD_REFERENCE_MEAN = 30.0  # the ROI mean brightness both constants abov
                                   # matters: this signal is an absolute pixel-value spread, not
                                   # exposure-normalized like _estimate_cloud_cover's radiance rate.
 
+HAZE_INNER_ROI_RATIO = 0.35      # zenith-only sub-ROI the spread is now measured over (see
+                                  # _estimate_cloud_cover_haze) - same ratio tools/night_cloud_
+                                  # reference_collector.py's diagnostic haze_spread_inner column
+                                  # has used since 2026-09-10 specifically to separate this site's
+                                  # horizon light-pollution glow from real cloud (see that constant's
+                                  # own comment above, "a zenith-only inner-ROI check... stayed under
+                                  # 6.0"). Verified 2026-09-18 by re-running the real end-to-end
+                                  # function against 9 archived frames across 4 nights: see
+                                  # _estimate_cloud_cover_haze's own docstring for the real numbers.
+
 
 def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False, twilight_fixed_shutter_band=False):
     """
@@ -696,9 +706,69 @@ def _estimate_cloud_cover_haze(gray, sky_mask):
     old fixed target_mean=30) shifts by under half a point under this
     rescaling - it's a no-op on the exact dataset HAZE_SPREAD_LOW/HIGH were
     validated against, and only corrects the new target_mean-driven cases.
+
+    Measured over a zenith-only sub-ROI (HAZE_INNER_ROI_RATIO), not the full
+    sky_mask passed in - added 2026-09-18 after the rescaling above still
+    left a live false-positive: real v49 frames with a clearly star-filled
+    sky (7-76 stars) kept reading 100% whole-frame cloud_cover (e.g.
+    skycam_20260917_01281789601283YTL.jpg: 24 stars in its own overlay).
+    Root cause: the mean-rescaling above corrects for a globally-caused
+    brightness shift, but this site's own horizon light-pollution glow is a
+    spatially localized confound - it inflates the p90-p10 spread across the
+    FULL ROI regardless of whether the zenith itself is genuinely clear,
+    exactly the mechanism HAZE_SPREAD_LOW's own comment already documented
+    from the 2026-09-10 retrospective scan ("a zenith-only inner-ROI check
+    on the same frames stayed under 6.0"), which was never wired into
+    production - only ever a manual diagnostic, later formalized as
+    tools/night_cloud_reference_collector.py's haze_spread_inner column
+    (logged unrescaled, for visibility only, not the same as this function's
+    own rescaled output).
+
+    Verified by re-running the real, fully-parameterized analyze_sky_robust
+    (diametro_rapporto=0.65, sensibilita=0.4, min_contrasto=30 - production's
+    own args) end-to-end against 9 real archived frames spanning 4 nights
+    (2026-09-11, 09-13, 09-16, 09-17; both pre-v49 and live-v49 captures):
+    every one of the 8 frames independently known to be a false positive
+    (7-76 stars, previously reporting 79-100%) now reads 6.3-20.9%, while
+    the one frame independently confirmed as a real overcast/hazy patch
+    (2026-09-11 22:00, 1 star, washed-out uniform sky glow) stays exactly at
+    100% - both before and after this change. Checked what's left driving
+    each of those 8 residual readings (analyze_sky_robust's other two
+    signals, computed from the same rows' logged tex_std/radiance_rate):
+    in all 8, the reported value matches max(texture_score, brightness_
+    signal) to within rounding - i.e. this signal itself now reads at or
+    below the noise floor on every one of them, not just "lower than
+    before". The other two signals were already carrying these frames; this
+    change stops haze from silently overriding them.
+
+    Real, deliberate cost, not free, though not yet observed as an actual
+    miss: a cloud patch that sits only in the outer ~2/3 of the frame
+    (between HAZE_INNER_ROI_RATIO and the full ROI) without ever reaching
+    the zenith is now invisible to this specific signal - the same kind of
+    narrowed-but-bounded trade-off HAZE_SPREAD_LOW and the texture-only
+    signal's self-referential mean already carry elsewhere in this module.
+    The other two signals in analyze_sky_robust (radiance rate, cloud-scale
+    texture) are unaffected - they already operate over the full sky_mask -
+    so this only narrows the one signal that was structurally blind to a
+    uniform/broad veil in the first place.
     '''
+    inner_roi = roi_mask(gray, HAZE_INNER_ROI_RATIO)
+    inner_mask = cv2.bitwise_and(sky_mask, inner_roi)
+    if not np.any(inner_mask == 255):
+        # zenith fully obstructed/masked (e.g. an obstruction sitting exactly
+        # at frame center - the Moon/bright-source case is already excluded
+        # upstream via analyze_sky_robust's source_found gate, so this isn't
+        # that). Falling back to the full ROI here would silently reintroduce
+        # the exact horizon-glow false-positive this change exists to fix, on
+        # the one path where the caller has the least reason to trust the
+        # result. This signal only exists to catch what the other two miss
+        # (see this function's own docstring) - if it can't measure the
+        # zenith at all, 0.0 and let radiance rate / cloud-scale texture
+        # (still full-ROI, unaffected by this change) carry the frame.
+        return 0.0
+
     bg = cv2.GaussianBlur(gray.astype(np.float64), (0, 0), sigmaX=HAZE_BG_SIGMA)
-    vals = bg[sky_mask == 255]
+    vals = bg[inner_mask == 255]
     spread = np.percentile(vals, 90) - np.percentile(vals, 10)
     mean_val = vals.mean()
     if mean_val > 0:

@@ -41,17 +41,15 @@ def test_large_patch_scores_at_ceiling():
 
 def test_moderate_patch_scores_strictly_between():
     # a smaller step than the ceiling case - should land strictly inside
-    # (0, 1), not saturate either boundary. Step size (17, not the original
-    # 10, or the 13 used between the 2026-09-10 HAZE_SPREAD_LOW revision and
-    # the 2026-09-13 reference-mean rescaling) chosen to produce a rescaled
-    # spread ~13.2 - comfortably between HAZE_SPREAD_LOW=11.0 and
-    # HAZE_SPREAD_HIGH=14.0 after _estimate_cloud_cover_haze rescales by
-    # HAZE_SPREAD_REFERENCE_MEAN/actual mean (background=30, patch=47 here
-    # raises the whole-frame mean, which pulls the raw spread trying to hit
-    # ~13 back down under LOW - see _estimate_cloud_cover_haze's docstring
-    # for why this rescaling exists).
+    # (0, 1), not saturate either boundary. Step size (27, not the 17 used
+    # before the 2026-09-18 zenith-only-ROI change) re-picked for the new
+    # inner-ROI measurement: cropping to HAZE_INNER_ROI_RATIO samples
+    # proportionally more of the blurred transition zone around the step
+    # than the old full-ROI measurement did, softening the spread for any
+    # given step size - the old value (47) now lands at the 0.0 floor
+    # instead of strictly between.
     gray = np.full((HEIGHT, WIDTH), 30, dtype=np.uint8)
-    gray[:, WIDTH // 2:] = 47
+    gray[:, WIDTH // 2:] = 57
     sky_mask = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
 
     score = sc._estimate_cloud_cover_haze(gray, sky_mask)
@@ -97,3 +95,61 @@ def test_sky_mask_excludes_obstruction_from_spread():
     score = sc._estimate_cloud_cover_haze(gray, sky_mask)
 
     assert score == 0.0
+
+
+def test_horizon_ring_glow_does_not_trigger_ceiling():
+    # regression for the 2026-09-18 live v49 false-positive: this site's own
+    # horizon light-pollution glow (a bright ring near the ROI edge, well
+    # outside HAZE_INNER_ROI_RATIO's zenith-only disk) inflated the full-ROI
+    # p90-p10 spread past HAZE_SPREAD_HIGH on real clear, star-filled nights
+    # (e.g. 76 stars detected, still read "Clouds: 100%" - see starscalc.py's
+    # updated _estimate_cloud_cover_haze docstring for the real frame
+    # evidence). A bright ring confined to the outer part of the ROI, with a
+    # uniform zenith, must no longer peg this signal at the ceiling.
+    gray = np.full((HEIGHT, WIDTH), 30, dtype=np.uint8)
+    sky_mask = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
+    cy, cx = HEIGHT // 2, WIDTH // 2
+    yy, xx = np.ogrid[:HEIGHT, :WIDTH]
+    dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+    outer_ring = (dist > 300) & (dist < 380)  # well outside the inner disk (radius ~179)
+    gray[outer_ring] = 120
+
+    score = sc._estimate_cloud_cover_haze(gray, sky_mask)
+
+    assert score == 0.0
+
+
+def test_zenith_fully_masked_scores_zero_not_full_roi_fallback():
+    # if the inner (zenith-only) disk has no sky pixels at all - e.g. an
+    # obstruction sitting exactly at frame center - falling back to the full
+    # ROI would silently reintroduce the horizon-glow false positive this
+    # signal was just fixed to avoid. Must return 0.0 instead and let the
+    # other two analyze_sky_robust signals (still full-ROI) carry the frame.
+    gray = np.full((HEIGHT, WIDTH), 30, dtype=np.uint8)
+    gray[:, WIDTH // 2:] = 120  # would score 1.0 under the old full-ROI behavior
+    sky_mask = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
+    cy, cx = HEIGHT // 2, WIDTH // 2
+    yy, xx = np.ogrid[:HEIGHT, :WIDTH]
+    dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+    sky_mask[dist < 200] = 0  # blanks out the entire inner disk (radius ~179)
+
+    score = sc._estimate_cloud_cover_haze(gray, sky_mask)
+
+    assert score == 0.0
+
+
+def test_patch_reaching_the_zenith_still_scores_at_ceiling():
+    # confirms the fix doesn't just suppress everything: a patch that DOES
+    # reach the zenith (unlike the horizon-ring-only case above) must still
+    # be caught, same as the known real overcast/hazy patch (2026-09-11
+    # 21:22-22:30, 1-7 stars, correctly read 100% both before and after this
+    # change per the real-dataset check documented in the docstring).
+    gray = np.full((HEIGHT, WIDTH), 30, dtype=np.uint8)
+    gray[:, WIDTH // 2:] = 120  # same step as test_large_patch_scores_at_ceiling,
+                                # which also still passes: the step runs through
+                                # the frame center, so it bisects the inner disk too
+    sky_mask = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
+
+    score = sc._estimate_cloud_cover_haze(gray, sky_mask)
+
+    assert score == 1.0
