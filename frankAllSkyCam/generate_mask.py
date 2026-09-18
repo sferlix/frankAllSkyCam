@@ -24,6 +24,25 @@ from frankAllSkyCam import fileManager, staticmask, starscalc
 CALIBRATION_ROI_RATIO = 0.65  # matches __main__.py's own analyze_sky_robust call
 MAX_CALIBRATION_FRAMES = 60   # bounds runtime/memory; evenly sampled if more are available
 MIN_CALIBRATION_FRAMES = 5    # below this, refuse rather than generate a mask from too little data
+MAX_CALIBRATION_CLOUD_PCT = 10.0  # initial, unvalidated default (same caveat as
+                               # staticmask.py's own generation constants - revisit
+                               # once real generated masks have been visually
+                               # reviewed). A frame with real cloud sitting over
+                               # part of the sky reads dark there, same as a real
+                               # obstruction would - config.txt's days_retention
+                               # (3 by default) means the calibration set is
+                               # realistically only 3-4 nights of frames, so even
+                               # one partly-cloudy night can bias the median stack
+                               # (confirmed on a real generated mask, 2026-09-18:
+                               # two large excluded regions that didn't follow the
+                               # actual tree silhouette at all, sitting over open
+                               # starfield with the Milky Way visible through them
+                               # in the preview). Frames above this threshold are
+                               # dropped before the median/Otsu step in
+                               # staticmask.generate_mask, not after - keeping a
+                               # contaminated frame OUT of the stack in the first
+                               # place, rather than trying to correct for it
+                               # afterward.
 
 
 def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
@@ -33,6 +52,16 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
     fileManager.getOutputFileName's own img/YYYYMMDD/ layout), evenly
     sampled across the available set if more than max_frames are found.
     Night frames only - see staticmask.py's module docstring for why.
+
+    Also clear-sky only (see MAX_CALIBRATION_CLOUD_PCT): a candidate is
+    scored with the real, currently-installed starscalc.analyze_sky_robust
+    (same function production uses, not a re-derived approximation) and
+    dropped if it reads above the cloud threshold. Archived frames have no
+    known exposure_secs (this platform's libcamera-still output has no
+    EXIF - see starscalc._read_exposure_seconds), so this runs the night
+    branch's weaker "exposure unknown" fallback signal rather than its
+    full exposure-normalized one; a generous threshold is used to allow
+    for that.
 
     Only real capture files (fileManager.getOutputFileName's "skycam_*.jpg"
     naming) are considered - this deliberately excludes other composite
@@ -64,15 +93,29 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
     staticmask.generate_mask's np.stack on mismatched array shapes.
     '''
     all_paths = sorted(glob.glob(os.path.join(img_root, "[0-9]" * 8, "skycam_*.jpg")))
-    night_candidates = []  # (path, shape) for frames that pass the night check
+    night_candidates = []  # (path, shape) for frames that pass the night + clear-sky checks
+    cloudy_dropped = 0
     for path in all_paths:
         img = cv2.imread(path)
         if img is None:
             continue
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         roi = starscalc.roi_mask(gray, CALIBRATION_ROI_RATIO)
-        if gray[roi == 255].mean() <= starscalc.DAYTIME_MEAN_THRESHOLD:
-            night_candidates.append((path, gray.shape))
+        if gray[roi == 255].mean() > starscalc.DAYTIME_MEAN_THRESHOLD:
+            continue  # day frame, not a night calibration candidate at all
+
+        _, cloud_pct = starscalc.analyze_sky_robust(path, diametro_rapporto=CALIBRATION_ROI_RATIO)
+        if cloud_pct > MAX_CALIBRATION_CLOUD_PCT:
+            cloudy_dropped += 1
+            continue
+
+        night_candidates.append((path, gray.shape))
+
+    if cloudy_dropped > 0:
+        print("NOTE: dropped " + str(cloudy_dropped) + " candidate night frame(s) "
+              "reading above " + ("%.1f" % MAX_CALIBRATION_CLOUD_PCT) + "% cloud "
+              "cover - real cloud sitting over part of the sky would otherwise "
+              "bias the calibration median the same way a real obstruction does.")
 
     if not night_candidates:
         return []
@@ -152,13 +195,14 @@ def main():
     picture_rotation = int(config['resolution']['picture_rotation'])
     _refuse_if_rotated(picture_rotation)
 
-    print("Scanning " + img_root + " for real night frames...")
+    print("Scanning " + img_root + " for real, clear-sky night frames...")
     frame_paths = _select_calibration_frames(img_root)
 
     if len(frame_paths) < MIN_CALIBRATION_FRAMES:
-        print("ERROR: found only " + str(len(frame_paths)) + " usable night frames "
-              "(need at least " + str(MIN_CALIBRATION_FRAMES) + "). "
-              "Wait for more real captures and try again.")
+        print("ERROR: found only " + str(len(frame_paths)) + " usable clear-sky night frames "
+              "(need at least " + str(MIN_CALIBRATION_FRAMES) + "). This also happens on a run "
+              "of cloudy/hazy nights, not just too few captures overall - wait for more real "
+              "clear nights and try again.")
         sys.exit(1)
 
     print("Using " + str(len(frame_paths)) + " real night frames.")

@@ -26,8 +26,14 @@ def test_select_calibration_frames_keeps_only_night_frames(tmp_path):
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     _write_frame(str(day_dir / "skycam_20260101_080000.jpg"), 200)  # well above DAYTIME_MEAN_THRESHOLD
-    _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)  # well below it
-    _write_frame(str(day_dir / "skycam_20260101_020000.jpg"), 40)
+    # both below DAYTIME_MEAN_THRESHOLD AND CLOUD_BRIGHTNESS_LOW (33) - a
+    # uniform-gray synthetic frame has no known exposure_secs (matches a
+    # real archived frame - see MAX_CALIBRATION_CLOUD_PCT's own comment),
+    # so it's scored by the weaker brightness-only fallback; 40 used to be
+    # used here too, but reads as ~41% cloud under that fallback since the
+    # clear-sky filter was added - not what this test is checking
+    _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)
+    _write_frame(str(day_dir / "skycam_20260101_020000.jpg"), 28)
 
     result = generate_mask._select_calibration_frames(str(tmp_path), max_frames=10)
 
@@ -92,6 +98,29 @@ def test_select_calibration_frames_ignores_non_daily_folders(tmp_path):
 
     assert len(result) == 1
     assert "aurora" not in result[0]
+
+
+def test_select_calibration_frames_drops_cloudy_night_frames(tmp_path, capsys):
+    # regression for the 2026-09-18 mask review: a real generated mask had
+    # two large excluded regions that didn't follow the actual tree
+    # silhouette at all, sitting over open starfield - traced to real cloud
+    # cover in part of the (only ~3-4 night, per config.txt's
+    # days_retention) calibration set biasing the median the same way a
+    # real obstruction does. A uniform gray value well above
+    # CLOUD_BRIGHTNESS_LOW (33) reads as cloudy under the weaker
+    # "exposure unknown" fallback this archived-frame path uses (no known
+    # exposure_secs), same as a real thin/hazy frame would with no
+    # brightness reference to correct against.
+    day_dir = tmp_path / "20260101"
+    day_dir.mkdir()
+    _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)   # clear - kept
+    _write_frame(str(day_dir / "skycam_20260101_020000.jpg"), 48)   # reads as heavily cloudy - dropped
+
+    result = generate_mask._select_calibration_frames(str(tmp_path), max_frames=10)
+
+    assert len(result) == 1
+    assert "010000" in os.path.basename(result[0])
+    assert "dropped" in capsys.readouterr().out.lower()
 
 
 def test_select_calibration_frames_drops_frames_with_mismatched_shape(tmp_path, capsys):
