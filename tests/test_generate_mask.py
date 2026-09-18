@@ -123,6 +123,41 @@ def test_select_calibration_frames_drops_cloudy_night_frames(tmp_path, capsys):
     assert "dropped" in capsys.readouterr().out.lower()
 
 
+def test_select_calibration_frames_fast_forwards_past_a_cloudy_stretch(tmp_path, capsys):
+    # a cloudy reading should fast-forward CALIBRATION_CLOUD_SKIP_MINUTES of
+    # real time ahead (checked via mtime) rather than re-scoring every
+    # frame in between - cloud cover persists over real time far more than
+    # it varies frame to frame (see CALIBRATION_CLOUD_SKIP_MINUTES's own
+    # comment for the real-data evidence). Frame timeline (mtime offsets in
+    # minutes from an arbitrary epoch): 0=clear (kept), 5=cloudy (dropped,
+    # triggers a 20-minute skip window -> resumes at 25), 10=would read
+    # clear but falls inside the skip window (never opened, silently
+    # missed - the accepted cost of the speedup), 30=clear and past the
+    # skip window (kept).
+    day_dir = tmp_path / "20260101"
+    day_dir.mkdir()
+    base = 1_000_000  # arbitrary epoch reference; only relative offsets matter
+    frames = [
+        ("skycam_20260101_000000.jpg", 30, 0),    # clear - kept
+        ("skycam_20260101_000500.jpg", 48, 5),    # cloudy - dropped, starts a 20min skip
+        ("skycam_20260101_001000.jpg", 30, 10),   # inside the skip window - never opened
+        ("skycam_20260101_003000.jpg", 30, 30),   # past the skip window - kept
+    ]
+    for name, gray_val, minute_offset in frames:
+        path = str(day_dir / name)
+        _write_frame(path, gray_val)
+        t = base + minute_offset * 60
+        os.utime(path, (t, t))
+
+    result = generate_mask._select_calibration_frames(str(tmp_path), max_frames=10)
+
+    kept = {os.path.basename(p) for p in result}
+    assert kept == {"skycam_20260101_000000.jpg", "skycam_20260101_003000.jpg"}
+    out = capsys.readouterr().out.lower()
+    assert "dropped 1" in out
+    assert "fast-forwarded past 1" in out
+
+
 def test_select_calibration_frames_drops_frames_with_mismatched_shape(tmp_path, capsys):
     # Finding 4: a capture resolution change partway through the retention
     # window must not crash np.stack later - frames whose shape doesn't

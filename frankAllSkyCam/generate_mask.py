@@ -43,6 +43,29 @@ MAX_CALIBRATION_CLOUD_PCT = 10.0  # initial, unvalidated default (same caveat as
                                # contaminated frame OUT of the stack in the first
                                # place, rather than trying to correct for it
                                # afterward.
+CALIBRATION_CLOUD_SKIP_MINUTES = 20  # initial, unvalidated default. Cloud cover
+                               # persists over real time far more than it varies
+                               # frame to frame (confirmed on real data,
+                               # 2026-09-18: a full-night sample found long
+                               # unbroken cloudy stretches, e.g. 19:35-21:56
+                               # straight through at 15-82% cloud) - once a
+                               # candidate reads above MAX_CALIBRATION_CLOUD_PCT,
+                               # every file within this many real minutes
+                               # afterward is skipped without even being opened
+                               # (checked via a cheap mtime stat, not a decode),
+                               # rather than re-running the full, expensive
+                               # analyze_sky_robust (star detection + multiple
+                               # signals) on each one only to reach the same
+                               # conclusion. Only a cloudy reading triggers a
+                               # skip - a clear one never does, since clear
+                               # frames are exactly what this is trying to find
+                               # as many of as (cheaply) possible. If the sky
+                               # clears within the skip window, those specific
+                               # frames are missed - an acceptable cost for the
+                               # speedup given a real night typically has far
+                               # more usable frames than MIN_CALIBRATION_FRAMES
+                               # needs (see MAX_CALIBRATION_CLOUD_PCT's own
+                               # comment for the real yield data).
 
 
 def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
@@ -62,6 +85,11 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
     branch's weaker "exposure unknown" fallback signal rather than its
     full exposure-normalized one; a generous threshold is used to allow
     for that.
+
+    A cloudy reading fast-forwards CALIBRATION_CLOUD_SKIP_MINUTES of real
+    time ahead before the next frame is even opened, rather than paying
+    for the full analyze_sky_robust call on every frame of what's usually
+    a long, unbroken cloudy stretch - see that constant's own comment.
 
     Only real capture files (fileManager.getOutputFileName's "skycam_*.jpg"
     naming) are considered - this deliberately excludes other composite
@@ -95,7 +123,19 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
     all_paths = sorted(glob.glob(os.path.join(img_root, "[0-9]" * 8, "skycam_*.jpg")))
     night_candidates = []  # (path, shape) for frames that pass the night + clear-sky checks
     cloudy_dropped = 0
+    skipped = 0
+    skip_until = None  # real epoch seconds; frames older than this are skipped unopened
     for path in all_paths:
+        if skip_until is not None:
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                mtime = None
+            if mtime is not None and mtime < skip_until:
+                skipped += 1
+                continue
+            skip_until = None
+
         img = cv2.imread(path)
         if img is None:
             continue
@@ -107,6 +147,7 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
         _, cloud_pct = starscalc.analyze_sky_robust(path, diametro_rapporto=CALIBRATION_ROI_RATIO)
         if cloud_pct > MAX_CALIBRATION_CLOUD_PCT:
             cloudy_dropped += 1
+            skip_until = os.path.getmtime(path) + CALIBRATION_CLOUD_SKIP_MINUTES * 60
             continue
 
         night_candidates.append((path, gray.shape))
@@ -115,7 +156,10 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
         print("NOTE: dropped " + str(cloudy_dropped) + " candidate night frame(s) "
               "reading above " + ("%.1f" % MAX_CALIBRATION_CLOUD_PCT) + "% cloud "
               "cover - real cloud sitting over part of the sky would otherwise "
-              "bias the calibration median the same way a real obstruction does.")
+              "bias the calibration median the same way a real obstruction does." +
+              (" Fast-forwarded past " + str(skipped) + " more, within " +
+               str(CALIBRATION_CLOUD_SKIP_MINUTES) + " minutes of a cloudy reading, "
+               "without re-checking each one." if skipped > 0 else ""))
 
     if not night_candidates:
         return []
