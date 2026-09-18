@@ -144,7 +144,16 @@ def _select_calibration_frames(img_root, max_frames=MAX_CALIBRATION_FRAMES):
         if gray[roi == 255].mean() > starscalc.DAYTIME_MEAN_THRESHOLD:
             continue  # day frame, not a night calibration candidate at all
 
-        _, cloud_pct = starscalc.analyze_sky_robust(path, diametro_rapporto=CALIBRATION_ROI_RATIO)
+        # skip_star_detection: this filter only needs cloud_pct, and star
+        # detection (_find_stars) is the single most expensive part of the
+        # night-branch pipeline - confirmed on a real 84.33.110.109 run,
+        # 2026-09-18: a single real night frame's full analysis measured
+        # ~16s, and a full mask-generation run over a 4308-frame retention
+        # window took over 40 minutes. cloud_cover never depends on
+        # star_count (independent code paths after the same obstruction/sky
+        # mask), so skipping it changes nothing about which frames get kept.
+        _, cloud_pct = starscalc.analyze_sky_robust(path, diametro_rapporto=CALIBRATION_ROI_RATIO,
+                                                     skip_star_detection=True)
         if cloud_pct > MAX_CALIBRATION_CLOUD_PCT:
             cloudy_dropped += 1
             skip_until = os.path.getmtime(path) + CALIBRATION_CLOUD_SKIP_MINUTES * 60

@@ -202,7 +202,7 @@ HAZE_INNER_ROI_RATIO = 0.35      # zenith-only sub-ROI the spread is now measure
                                   # _estimate_cloud_cover_haze's own docstring for the real numbers.
 
 
-def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False, twilight_fixed_shutter_band=False):
+def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False, twilight_fixed_shutter_band=False, skip_star_detection=False):
     """
     Analizza il cielo notturno per contare le stelle e stimare la copertura nuvolosa.
 
@@ -211,6 +211,16 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     - diametro_rapporto: dimensione della ROI circolare (0.1 - 1.0)
     - sensibilita: parametro per il filtro di circolarita' (0.1 - 1.0)
     - min_contrasto: soglia minima di intensita' per distinguere una stella dal rumore
+    - skip_star_detection: True per saltare _find_stars (star_count torna None)
+      quando serve solo cloud_cover - e' la parte piu' costosa della pipeline
+      notturna (piu' Gaussian blur, connected components, soglie adattive per
+      cella, declustering) e cloud_cover non dipende in alcun modo dal suo
+      risultato (calcolati da rami di codice indipendenti, dopo la stessa
+      maschera obstruction/sky). Aggiunto 2026-09-18 per
+      generate_mask.py._select_calibration_frames, che scarta star_count -
+      confermato con un benchmark reale su 84.33.110.109: un intero run di
+      generazione mask ha impiegato oltre 40 minuti su un retention window di
+      4308 frame, con un singolo frame notturno completo misurato a ~16s.
     - exposure_secs: durata di esposizione applicata (se nota); migliora la stima
       delle nuvole. Se omesso, si tenta l'EXIF del file e infine un fallback
       basato solo su luminosita'/texture. Ignorato se twilight_isp_mode=True o
@@ -244,7 +254,9 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
       silently reading day-branch values.
 
     OUTPUT:
-    - star_count: numero di stelle rilevate
+    - star_count: numero di stelle rilevate (None se skip_star_detection=True
+      e il branch notturno e' stato eseguito - sempre un int nei rami
+      diurno/degenerato, che non fanno mai star detection)
     - cloud_cover: percentuale di copertura nuvolosa (0-100)
     """
     print("calculating stars on: " + image_path)
@@ -271,7 +283,7 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
 
     sky_eroded = _erode_guard_band(sky)
 
-    star_count = _find_stars(gray, sky_eroded, min_contrasto, sensibilita)
+    star_count = None if skip_star_detection else _find_stars(gray, sky_eroded, min_contrasto, sensibilita)
     if twilight_fixed_shutter_band:
         cloud_cover = _estimate_cloud_cover_texture_only(gray, sky_eroded)
     elif twilight_isp_mode:
@@ -291,8 +303,8 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
             haze_cover = _estimate_cloud_cover_haze(gray, sky_eroded)
             cloud_cover = round(max(cloud_cover, 100.0 * haze_cover), 1)
 
-    print("end of starscalc. Stars =" + str(star_count) + ", clouds = " + str(cloud_cover) +
-          "%" + (" (moon in frame)" if source_found else ""))
+    print("end of starscalc. Stars =" + ("skipped" if star_count is None else str(star_count)) +
+          ", clouds = " + str(cloud_cover) + "%" + (" (moon in frame)" if source_found else ""))
     return star_count, cloud_cover
 
 
