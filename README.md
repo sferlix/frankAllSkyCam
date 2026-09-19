@@ -148,6 +148,15 @@ FTP_fileNameTimelapseMP4 = /video/frankAllSkycam
 FTP_fileNameStarTrailJPG = /startrail/startrail.jpg
 ```
 
+**Second copy of the image (optional).** To upload the same image a second time, to another folder with another file name on the same FTP server, add to `[ftp]` (it also needs `isFTP = True`; create the remote folder first):
+
+```ini
+2ndImageFolder = /other_folder/webcam/
+2ndImageFile = skycam
+```
+
+`2ndImageFolder` is the full remote folder path, `2ndImageFile` the file name (`.jpg` is added if missing). Both are needed: if either is missing or empty, nothing is uploaded a second time.
+
 Leave `isFTP = False` if you don't want any remote upload.
 
 **Sky status JSON (optional).** After every capture frankAllSkyCam writes `~/frankAllSkyCam/sky_status.json` with the numbers of that capture and the sky ephemeris:

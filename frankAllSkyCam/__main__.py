@@ -117,6 +117,9 @@ FTP_pass = str(config['ftp']['FTP_pass'])
 FTP_uploadFolder = str(config['ftp']['FTP_uploadFolder'])
 FTP_fileNameAllSkyImg = str(config['ftp']['FTP_fileNameAllSkyImgJPG'])
 FTP_fileName = FTP_uploadFolder + "/" + FTP_fileNameAllSkyImg
+# optional second copy of the sky image: full remote folder + file name (both needed)
+second_image_folder = config.get('ftp', '2ndImageFolder', fallback='')
+second_image_file = config.get('ftp', '2ndImageFile', fallback='')
 # optional: upload sky_status.json to the FTP server (off unless the customer enables it)
 isFTPSkyStatus = config.getboolean('ftp', 'isFTPSkyStatus', fallback=False)
 FTP_fileNameSkyStatus = config.get('ftp', 'FTP_fileNameSkyStatusJSON', fallback='')
@@ -394,6 +397,8 @@ def _run():
 
     # transfer files to your FTP server
     fileManager.saveToFTP(isFTP, jpg_file_name,FTP_server,FTP_login,FTP_pass,FTP_fileName+".jpg")
+    fileManager.saveSecondImageToFTP(isFTP, jpg_file_name, FTP_server, FTP_login, FTP_pass,
+                                     second_image_folder, second_image_file)
     if sky_status_written:
        skystatus.upload_status(appPath, isFTPSkyStatus, isFTP, FTP_server, FTP_login, FTP_pass,
                                FTP_uploadFolder + FTP_fileNameSkyStatus if FTP_fileNameSkyStatus else "")

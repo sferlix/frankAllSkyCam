@@ -295,6 +295,14 @@ FTP_uploadFolder =/your_folder/
 # uploaded file name (e.g.,allskycam.jpg). no need to add the jpg extention
 FTP_filenameAllSkyImgJPG = /img/allskycam
 
+# optional: also upload the image a second time, to another folder with another file name
+# (needs isFTP = True). 2ndImageFolder is the full remote folder path on the same FTP server
+# (create it first); 2ndImageFile is the file name (.jpg is added if missing), e.g.
+# 2ndImageFolder = /other_folder/webcam/  and  2ndImageFile = skycam.jpg
+# Both are needed; leave them empty to disable.
+2ndImageFolder =
+2ndImageFile =
+
 # allskycam_night.mp4 will be generated if nightTL = True
 # allskycam_24h.mp4 will be generated if fullTL = True
 FTP_fileNameTimelapseMP4 = /video/frankAllSkycam

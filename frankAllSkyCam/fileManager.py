@@ -38,6 +38,26 @@ def saveToFTP(isFTP,nomefile,FTP_server,FTP_login,FTP_pass,FTP_fileName):
       print("FTP ERROR")
 
 
+def saveSecondImageToFTP(isFTP, nomefile, FTP_server, FTP_login, FTP_pass, folder, filename):
+   # optional second copy of the sky image (config.txt [ftp] 2ndImageFolder / 2ndImageFile):
+   # folder is a full remote folder path, filename gets ".jpg" if it has no jpg extension.
+   # Both are needed, otherwise nothing is uploaded. Never raises; returns True if an upload
+   # was attempted (saveToFTP itself does nothing when isFTP is False).
+   folder = (folder or "").strip()
+   filename = (filename or "").strip()
+   if not folder or not filename:
+      return False
+   if not filename.lower().endswith((".jpg", ".jpeg")):
+      filename += ".jpg"
+   remote = folder.rstrip("/") + "/" + filename.lstrip("/")
+   try:
+      saveToFTP(isFTP, nomefile, FTP_server, FTP_login, FTP_pass, remote)
+      return True
+   except Exception as e:
+      print("WARNING: could not upload the 2nd image: " + str(e))
+      return False
+
+
 def createPath(dir):
    x = dir.split("/")
    l = len(x)
