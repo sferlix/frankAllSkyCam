@@ -28,9 +28,8 @@ def getOutput(command):
 def main():
   n=datetime.datetime.now()
   if not os.path.exists(myfile):
-     # fresh install, or right after a reboot/crash before the first capture
-     # cycle has run even once - nothing to compare against yet, and this
-     # isn't itself evidence of a stuck system, so don't crash or reboot.
+     # fresh install or right after a reboot/crash, before the first capture: nothing to
+     # compare against, so no reboot
      print(myfile + " does not exist yet - skipping this check.")
      return
   f=datetime.datetime.strptime(time.ctime(os.path.getmtime(myfile)), '%c')

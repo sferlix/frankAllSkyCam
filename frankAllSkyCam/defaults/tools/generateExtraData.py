@@ -64,14 +64,22 @@ else:
     DEW_HEATER_GPIO_PIN = 17
     DEW_HEATER_GPIO_ACTIVE_LOW = False
 
+# socket timeout for FTP (ftplib has none by default); covers connect and every read
+FTP_TIMEOUT_SECS = 30
+
+
+def _ftp_upload(local_path, remote_path):
+    # raises on failure - callers decide how best-effort they are
+    ftp = FTP(FTP_HOST, FTP_USER, FTP_PASS, timeout=FTP_TIMEOUT_SECS)
+    with open(local_path, "rb") as f:
+        ftp.storbinary("STOR " + remote_path, f)
+    ftp.quit()
+
 
 def sendWS90_data_to_web(json_path):
     print("send WS90 data to Web")
     try:
-        ftp = FTP(FTP_HOST, FTP_USER, FTP_PASS)
-        with open(json_path, "rb") as f:
-            ftp.storbinary("STOR " + FTP_UPLOAD_PATH, f)
-        ftp.quit()
+        _ftp_upload(json_path, FTP_UPLOAD_PATH)
         print("FTP OK")
     except Exception as e:
         # best-effort: a failed upload must never take down the caller,

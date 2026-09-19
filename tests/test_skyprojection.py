@@ -1,9 +1,6 @@
 '''
-Unit tests for skyprojection.py - ephemeris sun/moon position, real-data
-calibration sample storage, and the deliberately simple first-iteration
-nearest-neighbor lookup (see
-docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md
-section 5 - approach B, "no confident data -> don't guess").
+Unit tests for skyprojection.py: ephemeris sun/moon position, calibration sample
+storage and the nearest-neighbor lookup (None when there is no confident answer).
 '''
 
 import datetime
@@ -13,19 +10,14 @@ import pytest
 
 from frankAllSkyCam import skyprojection as sp
 
-# Real site coordinates from this project's own defaults/config.txt, used
-# only as plausible real-world inputs for range/sanity checks below - not
-# asserting exact ephem output values (no independently-verified reference
-# to check against, same reasoning calculateEphem.py's own lack of unit
-# tests has historically had - see frankallskycam_twilight_handoff_status
-# memory).
+# site coordinates from defaults/config.txt: plausible inputs for range and sanity
+# checks, not exact ephem values
 LAT, LON, ELEVATION = 44.75, 9.29, 1150
 
 
 def test_sun_alt_az_below_horizon_at_local_midnight_in_january():
-    # 2026-01-15 00:00 local (UTC+1, no DST) = 2026-01-14 23:00 UTC - the
-    # Sun must be well below the horizon at this latitude at this hour,
-    # regardless of exact ephem precision.
+    # 2026-01-15 00:00 local (UTC+1, no DST) = 2026-01-14 23:00 UTC: the Sun must be well
+    # below the horizon at this latitude at this hour
     dt_utc = datetime.datetime(2026, 1, 14, 23, 0, tzinfo=datetime.timezone.utc)
 
     alt, az = sp.sun_alt_az(dt_utc, LAT, LON, ELEVATION)
@@ -49,12 +41,8 @@ def test_moon_alt_az_returns_plausible_ranges():
 
     assert -90 <= alt <= 90
     assert 0 <= az < 360
-    # A value still in radians (max ~6.28) would also pass the two range
-    # checks above, so a missing math.degrees() conversion in moon_alt_az
-    # would go completely undetected by this test alone. Confirmed for
-    # this fixed date/time that az is ~253.8 degrees, comfortably above
-    # 2*pi (~6.283) - this assertion can only pass for a genuinely
-    # degrees-scaled azimuth.
+    # a value still in radians (max ~6.28) would pass the range checks above; at this fixed
+    # date/time az is ~253.8 degrees, above 2*pi, so this only passes for degrees
     assert az > 6.3
 
 
@@ -78,12 +66,8 @@ def test_load_calibration_samples_returns_empty_when_missing(tmp_path):
 
 
 def test_record_calibration_sample_write_failure_does_not_raise(tmp_path, capsys):
-    # csv_path's parent directory doesn't exist, so open(..., "a") raises
-    # OSError (FileNotFoundError). record_calibration_sample is called
-    # from a cron job (tools/skycalibration_collector.py) - it must never
-    # let a write failure propagate as a raw traceback, matching this
-    # project's established "never a traceback" convention for
-    # diagnostic/collector tools (see staticmask.py's own WARNING prints).
+    # csv_path's parent directory doesn't exist, so open(..., "a") raises OSError:
+    # record_calibration_sample runs from a cron job and must not propagate it
     csv_path = str(tmp_path / "no_such_dir" / "calibration.csv")
 
     sp.record_calibration_sample(csv_path, "2026-06-21T22:00:00+00:00", "sun", 45.0, 180.0, 512.0, 384.0)
@@ -116,14 +100,11 @@ def test_lookup_pixel_position_returns_none_when_too_far():
 
 
 def test_lookup_pixel_position_handles_azimuth_wraparound():
-    # Azimuth is circular: 359° and 1° are only 2° apart, not 358°.
-    # A sample at az=359° should be recognized as close to a query at az=1°.
-    # This test catches the bug where unwrapped Euclidean az-distance would
-    # compute 358° and wrongly reject it as "too far" even with
-    # max_distance_deg=5.0.
-    samples = [(45.0, 359.0, 500.0, 380.0)]  # true distance: ~2° (alt diff + az wraparound)
+    # azimuth is circular: a sample at az=359 is close to a query at az=1 (about 2 degrees
+    # apart, not 358), so it must be found within max_distance_deg=5.0
+    samples = [(45.0, 359.0, 500.0, 380.0)]  # true distance: about 2 degrees (alt diff + az wraparound)
 
     result = sp.lookup_pixel_position(45.0, 1.0, samples, max_distance_deg=5.0)
 
-    # Should find it, not reject it as "too far"
+    # found, not rejected as too far
     assert result == (500.0, 380.0)

@@ -1,22 +1,16 @@
 '''
-Dark frame subtraction - the standard astrophotography fix for hot pixels
-and dark current: cancels the whole per-pixel dark signal captured under
-the same settings, rather than correcting a pre-calibrated list of
-coordinates (see hotpixels.py). More general (also cancels diffuse dark
-current that isn't an isolated red outlier), but requires a physical dark
-library captured with the dome covered - see capturedarks.py.
+Dark frame subtraction: cancels the per-pixel dark signal (hot pixels and diffuse dark
+current) captured under the same settings. The alternative is the coordinate list of
+hotpixels.py; this needs a dark library captured with the dome covered (see
+capturedarks.py).
 
-Opt-in via directory presence: no appPath/darks/manifest.json -> load()
-returns None -> applyToFile() is a no-op. A library is only valid for the
-exact additional_night_params/night_mode/night_sharpness/night_contrast it
-was captured under - load() checks this and refuses a stale library rather
-than silently subtracting the wrong thing.
+Opt-in by directory: without appPath/darks/manifest.json load() returns None and
+applyToFile() does nothing. A library is valid only for the exact
+additional_night_params/night_mode/night_sharpness/night_contrast it was captured
+under; load() refuses a stale one.
 
-Not textbook-perfect: real dark subtraction happens on linear RAW data
-before any ISP processing. This pipeline only has JPEG output, already
-through a nonlinear contrast curve and lossy compression by the time it's
-captured. Still expected to meaningfully cancel a localized hot-pixel
-spike; less rigorous for subtle diffuse dark current.
+Approximate: the frames are JPEGs (nonlinear, lossy), not linear RAW, so it cancels a
+localized hot-pixel spike well and subtle diffuse dark current less so.
 '''
 
 import os
@@ -38,10 +32,9 @@ def darkFilename(exposure_secs):
 
 def load(appPath, additional_night_params, night_mode, night_sharpness, night_contrast):
     '''
-    Returns (exposures, frames) - exposures sorted ascending (list of
-    float seconds), frames a matching list of numpy arrays (as returned by
-    cv2.imread) - or None if the library is missing, empty, incomplete, or
-    was captured under different night parameters than currently active.
+    Returns (exposures, frames): exposures sorted ascending (seconds) and the matching
+    cv2.imread arrays; or None if the library is missing, empty, incomplete or was
+    captured under different night parameters.
     '''
     manifest_path = os.path.join(_darks_dir(appPath), MANIFEST_FILENAME)
     try:
@@ -81,10 +74,8 @@ def load(appPath, additional_night_params, night_mode, night_sharpness, night_co
 
 def _interpolatedDark(exposures, frames, exposure_secs):
     '''
-    Linearly interpolates between the two library exposures bracketing
-    exposure_secs (dark current accumulates ~linearly with time). Clamps
-    to the nearest end frame rather than extrapolating past the library's
-    range.
+    Linear interpolation between the two library exposures bracketing exposure_secs;
+    clamps to the nearest end frame outside the library's range.
     '''
     if exposure_secs <= exposures[0]:
         return frames[0].astype(np.float32)
@@ -121,9 +112,7 @@ def applyToFile(jpg_file_name, appPath, exposure_secs, additional_night_params,
         return False
 
     corrected = subtract(image, exposures, frames, exposure_secs)
-    # starscalc/autoexposure/drawtext all re-read this file from disk rather
-    # than taking an in-memory array, so this write can't be avoided - but
-    # quality 100 (vs cv2's default ~95) keeps it as close to lossless as a
-    # JPEG re-encode gets, since the final watermark save re-encodes again.
+    # starscalc/autoexposure/drawtext re-read the file from disk; quality 100 keeps the
+    # re-encode near-lossless
     cv2.imwrite(jpg_file_name, corrected, [cv2.IMWRITE_JPEG_QUALITY, 100])
     return True

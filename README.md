@@ -150,6 +150,35 @@ FTP_fileNameStarTrailJPG = /startrail/startrail.jpg
 
 Leave `isFTP = False` if you don't want any remote upload.
 
+**Sky status JSON (optional).** After every capture frankAllSkyCam writes `~/frankAllSkyCam/sky_status.json` with the numbers of that capture and the sky ephemeris:
+
+```json
+{
+  "timestamp": "2026-09-19T21:30:00Z",
+  "timestamp_local": "2026-09-19T23:30:00+02:00",
+  "night_start": "2026-09-19T19:05:14Z",
+  "night_end": "2026-09-20T03:28:18Z",
+  "sun_rise": "2026-09-20T05:08:41Z",
+  "sun_set": "2026-09-20T17:23:02Z",
+  "moon_rise": "2026-09-19T13:54:23Z",
+  "moon_set": "2026-09-19T22:02:34Z",
+  "moon_illumination_pct": 56.8,
+  "moon_phase": "Waxing Gibbous",
+  "sqm": 20.84,
+  "star_count": 86,
+  "cloud_cover": 4.5
+}
+```
+
+Times are UTC. `sqm` and `star_count` are 0 outside a night exposure. To upload it to your website on every capture, add to `[ftp]` (it also needs `isFTP = True`; create the remote folder first):
+
+```ini
+isFTPSkyStatus = True
+FTP_fileNameSkyStatusJSON = /status/sky_status.json
+```
+
+It is off by default.
+
 ### Timelapses
 
 ```ini
@@ -235,6 +264,7 @@ Both are entirely optional - frankAllSkyCam works fine without either.
 `~/frankAllSkyCam/tools/` holds small, independent scripts meant for **you to edit** - they live outside the installed package specifically so a `pip install --upgrade` never touches your customizations.
 
 - **`generateExtraData.py`** collects data from your own devices (a weather station, a Shelly smart plug, an I2C temperature/humidity sensor, ...) and writes a single text string that gets watermarked onto the image (enable it via `et_use = y` under `[extra_text]` in `config.txt`). Several ready-made helper functions are included (Ecowitt/WS90-style JSON stations, a Davis Vantage Pro2 plaintext feed, Shelly devices) - uncomment and configure the ones you have in `getData()`.
+- A WS90-style weather station is exported by this script as its own JSON (`~/frankAllSkyCam/tools/ws90_data.json`, optionally uploaded with the `[ftp]` section of `generateExtraData.conf`), independent of `sky_status.json`.
 - **`generateExtraData.conf`**, sitting next to it, holds your device URLs/IPs and credentials - kept separate from the main `config.txt` on purpose, so this file can be handed to (or edited by) someone who only needs to touch sensor settings.
 - The same file can also **switch a dew heater on/off**, based on `(internal temperature - dew point)`, reusing whatever sensor readings you already fetch for the watermark text (no extra network calls). It supports either a network relay (e.g. a Shelly) or a relay wired directly to a Raspberry Pi GPIO pin - see the `[dew_heater]` section in `generateExtraData.conf`.
 

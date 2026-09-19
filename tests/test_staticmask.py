@@ -1,9 +1,6 @@
 '''
-Unit tests for staticmask.py - the auto-generated static obstruction mask
-(median-stack + Otsu threshold + morphological smoothing over real night
-frames, see docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md
-section 4). Synthetic arrays, not real captures - matches this project's
-existing test style (test_starscalc_haze.py, test_starscalc_texture_only.py).
+Unit tests for staticmask.py: median stack + Otsu threshold + morphological smoothing
+of night frames into an obstruction mask, and loading it. Synthetic arrays.
 '''
 
 import numpy as np
@@ -19,11 +16,9 @@ def _roi_full():
 
 
 def test_generate_mask_excludes_fixed_dark_region():
-    # a fixed dark rectangle (simulating a tree silhouette) present at the
-    # same location in every frame, against a bright, frame-to-frame-varying
-    # background (simulating real sky/cloud variation) - the fixed dark
-    # region must read as obstruction (255); the varying bright region must
-    # not.
+    # a fixed dark rectangle (a tree silhouette) at the same place in every frame, against a
+    # bright background that varies from frame to frame: the fixed region must read as
+    # obstruction (255), the varying one must not
     roi = _roi_full()
     rng = np.random.default_rng(seed=42)
     frames = []
@@ -90,9 +85,8 @@ def test_get_static_mask_returns_mask_when_shape_matches(tmp_path):
 
 
 def test_get_static_mask_returns_none_when_implausibly_large(tmp_path, capsys):
-    # Finding 3a: a degenerate mask (e.g. from a false Otsu split with no
-    # real obstruction) must never be loaded and used live - it must fall
-    # back to the dynamic masks, exactly like the shape-mismatch case.
+    # a degenerate mask (e.g. a false Otsu split) must fall back to the dynamic masks,
+    # like the shape-mismatch case
     mask = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
     mask[:, :] = 255  # 100% excluded, well above MAX_PLAUSIBLE_EXCLUDED_PCT
     path = str(tmp_path / "mask.png")
@@ -105,9 +99,8 @@ def test_get_static_mask_returns_none_when_implausibly_large(tmp_path, capsys):
 
 
 def test_get_static_mask_returns_mask_when_excluded_pct_within_threshold(tmp_path):
-    # exclude a fraction just under MAX_PLAUSIBLE_EXCLUDED_PCT (60%) so this
-    # actually exercises the guard's accept boundary, not just any old
-    # mask - HEIGHT=WIDTH=200, so 110 excluded rows out of 200 is 55%.
+    # exclude just under MAX_PLAUSIBLE_EXCLUDED_PCT (60%) to exercise the accept boundary:
+    # HEIGHT=WIDTH=200, so 110 excluded rows out of 200 is 55%
     assert staticmask.MAX_PLAUSIBLE_EXCLUDED_PCT == 60.0  # guards the 55% assumption below
     mask = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
     mask[0:110, :] = 255  # 55% excluded, just under the 60% threshold
@@ -121,8 +114,8 @@ def test_get_static_mask_returns_mask_when_excluded_pct_within_threshold(tmp_pat
 
 
 def test_save_mask_raises_on_write_failure(tmp_path):
-    # Finding 5: cv2.imwrite returns False (rather than raising) when the
-    # parent directory doesn't exist - save_mask must not swallow that.
+    # cv2.imwrite returns False (does not raise) when the parent directory doesn't exist:
+    # save_mask must not swallow that
     mask = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
     bad_path = str(tmp_path / "does_not_exist" / "mask.png")
 

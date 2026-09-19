@@ -1,10 +1,6 @@
 '''
-Unit tests for capturedarks._average_frames - the pixel-wise mean used to
-build a master dark from several individual dark captures at the same
-exposure (see DARK_FRAMES_PER_EXPOSURE's comment in capturedarks.py for the
-noise-reduction rationale). Synthetic arrays, not real captures - this is
-pure math (mean, rounding, clipping), no camera/site-specific calibration
-to validate against real images for.
+Unit tests for capturedarks._average_frames, the pixel-wise mean that builds a master
+dark from several dark captures. Synthetic arrays; pure math (mean, rounding, clipping).
 '''
 
 import numpy as np
@@ -40,11 +36,8 @@ def test_rounds_to_nearest_integer():
 
 
 def test_reduces_per_frame_deviation_from_the_true_fixed_pattern():
-    # a fixed pattern (100) plus a different deterministic per-frame offset
-    # on each frame (standing in for independent read/thermal noise) -
-    # averaging must land closer to the true fixed pattern than any single
-    # noisy frame did, confirming the averaging actually suppresses
-    # per-frame deviation rather than just picking one frame arbitrarily
+    # a fixed pattern (100) plus a different per-frame offset (independent read/thermal
+    # noise): the average must land closer to the fixed pattern than any single frame
     true_pattern = 100
     frames = [
         np.full((20, 20, 3), true_pattern + offset, dtype=np.uint8)

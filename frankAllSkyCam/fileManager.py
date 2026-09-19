@@ -12,13 +12,15 @@ from os import path
 #from frankAllSkyCam import calculateEphem
 
 def getCameraBinary():
-   # Raspberry Pi renamed libcamera-apps to rpicam-apps; a sufficiently
-   # fresh Raspberry Pi OS image ships only rpicam-still, with no
-   # libcamera-still compatibility alias at all. Prefer the current name,
-   # fall back to the old one for installs that predate the rename.
+   # rpicam-still is the current name of libcamera-still; older installs only have
+   # libcamera-still
    if shutil.which("rpicam-still"):
       return "rpicam-still"
    return "libcamera-still"
+
+# ftplib.FTP() has no socket timeout by default, so a session dropped without a FIN
+# would block a capture forever. The timeout covers the connect and every later read.
+FTP_TIMEOUT_SECS = 30
 
 def saveToFTP(isFTP,nomefile,FTP_server,FTP_login,FTP_pass,FTP_fileName):
    if not isFTP:
@@ -26,7 +28,7 @@ def saveToFTP(isFTP,nomefile,FTP_server,FTP_login,FTP_pass,FTP_fileName):
 
    try:
       print("Transferring " + nomefile + " to FTP: " + FTP_server + FTP_fileName + " ....")
-      session = ftplib.FTP(FTP_server,FTP_login,FTP_pass)
+      session = ftplib.FTP(FTP_server,FTP_login,FTP_pass,timeout=FTP_TIMEOUT_SECS)
       file = open(nomefile,'rb')
       session.storbinary("STOR " + FTP_fileName, file)
       file.close()
@@ -77,9 +79,8 @@ def getConfigFileName():
        #ensure folders do exist only if config.txt is not existing
        createAppFolders()
 
-    # every package-bundled seed template lives under defaults/, not loose
-    # among the .py files - so nothing in site-packages can be mistaken for
-    # the live copy (what every module actually reads/uses at runtime)
+    # seed templates live under defaults/, so nothing in site-packages can be mistaken
+    # for the live copy the modules read
     checkFile(fileName, "/defaults/config.txt")
     checkFile(htmlFile, "/defaults/tools/index.html")
     checkFile(sqmExpCsv, "/defaults/sqmexp.csv")
@@ -98,21 +99,15 @@ def getConfigFileName():
     return fileName
 
 def getStaticMaskFileName():
-    # No seeding via checkFile() - unlike every other path in
-    # getConfigFileName(), there is no package-shipped default to fall back
-    # to: this file is generated per-site by the user's own
-    # generate_mask.py CLI tool (see staticmask.py). Absence is a normal,
-    # expected state (fresh install, or before the user has run the tool
-    # yet) - callers must treat a missing file as "not generated yet", not
-    # as an error.
+    # not seeded by checkFile(): there is no packaged default, the file is generated per
+    # site by generate_mask.py. A missing file is a normal state, not an error.
     homePath = os.path.expanduser("~")
     return homePath + "/frankAllSkyCam/static_mask.png"
 
 def checkFile(destFileName, sourceFileName):
     if not os.path.isfile(destFileName):
-       # ensure the destination's directory exists - matters for files seeded
-       # into a subfolder (e.g. tools/) added after the initial install, when
-       # createAppFolders() (fresh-install only) never runs again
+       # ensure the destination's folder exists (files seeded into a subfolder such as
+       # tools/ after the initial install)
        destDir = os.path.dirname(destFileName)
        if destDir and not os.path.isdir(destDir):
           createPath(destDir)

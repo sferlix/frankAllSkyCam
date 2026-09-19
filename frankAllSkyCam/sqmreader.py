@@ -97,14 +97,9 @@ def readSQM(daytime=False):
     #print("  SQM_LE =" + SQM_LE)
 
     if daytime:
-       # full daytime (sun above horizon, set by the caller from sun
-       # position): frankAllSkyCam never needs an SQM value here at all -
-       # calculateExposure() always returns 0 regardless of it - so this
-       # skips the SQM-LE hardware read too, not just the camera-based
-       # pseudo-SQM fallback below. A previous version kept the hardware
-       # read running during the day on the assumption a cheap network call
-       # was harmless to leave on, but daytime SQM should never be computed
-       # at all, hardware or not.
+       # full daytime (set by the caller from the sun position): no SQM is needed
+       # (calculateExposure() returns 0), so neither the SQM-LE read nor the pseudo-SQM
+       # runs
        print("Full daytime - skipping SQM measurement entirely")
        return 0, sqm_le
 
@@ -114,9 +109,8 @@ def readSQM(daytime=False):
        if sqm < 0:
           sqm_le = "n"
 
-    # getPseudoSQM() takes real camera test shots (takePicture, up to a 5s
-    # exposure) to estimate sky brightness - worth it at night/twilight,
-    # already skipped above for full daytime by the early return.
+    # getPseudoSQM() takes real camera test shots (up to a 5s exposure); the early
+    # return above skips it in full daytime
     if SQM_DEBUG=="y" or sqm_le=="n":
        if sqm_le == "n":
           print("Problem with SQM_LE. Switching to PseudoSQM")
@@ -196,11 +190,8 @@ def takePicture(secs):
      os.system(comando)
 
      print("taking temp.jpg....")
-     # was "while exists:" with exists starting False - the wait never ran,
-     # relying entirely on os.system() above already blocking until
-     # libcamera-still exits. Fixed to actually wait (bounded, so a capture
-     # that never produces a file doesn't hang forever instead of raising a
-     # clear error in calculateRMS()).
+     # wait (bounded) for the file to appear, so a capture that produces none raises a
+     # clear error in calculateRMS() instead of hanging
      exists = os.path.exists(image_file)
      waited = 0.0
      while not exists and waited < 5:
@@ -272,19 +263,16 @@ def getRealSQM(ip, port):
             with socket.create_connection((ip, int(port)), timeout=3) as s:
                 s.sendall(b'rx')
                 print("SQM Socket open")
-                # accumulate until the device closes the connection (it does,
-                # after a single reply) rather than assuming a fixed length -
-                # the real SQM-LE response format ("r, 19.44m,0000000850Hz,
-                # 0000000000c,0038.7C") isn't always exactly the same length
+                # accumulate until the device closes the connection (after a single reply): the
+                # response length varies
                 data = b""
                 while len(data) < 128:
                     chunk = s.recv(128 - len(data))
                     if not chunk: break
                     data += chunk
                 print(data)
-                # parse the magnitude out by pattern, not by a fixed byte
-                # offset - a hardcoded slice breaks the moment the response
-                # length differs even slightly from what was assumed
+                # parse the magnitude by pattern, not by a fixed byte offset (the response length
+                # varies)
                 match = SQM_LE_RESPONSE_RE.search(data)
                 if not match:
                     raise ValueError("unrecognized SQM-LE response: " + repr(data))

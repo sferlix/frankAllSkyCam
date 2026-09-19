@@ -1,10 +1,6 @@
 '''
-Unit tests for starscalc._get_obstruction_mask - prefers the static mask
-when present and shape-compatible, falls back to today's existing dynamic
-obstruction masks otherwise (see
-docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md
-section 4: a fresh install with no generated mask yet must be no worse off
-than before this change).
+Unit tests for starscalc._get_obstruction_mask: it uses the static mask when present and
+matching the frame shape, otherwise the dynamic obstruction masks.
 '''
 
 import numpy as np

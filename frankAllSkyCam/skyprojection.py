@@ -1,24 +1,11 @@
 '''
-Sky projection calibration - the foundation for geometric sun/moon masking
-(and, later, star-catalog matching), see
-docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md section 5.
+Sky projection calibration: maps a body's (alt, az) to a pixel position for this
+camera. The (alt, az) of the Sun and Moon come from the ephemeris; the mapping to
+pixels is not a lens formula but is built from observed samples (see
+tools/skycalibration_collector.py), and lookups too far from any observed sample
+are refused.
 
-Deliberately does NOT compute pixel positions from a lens formula (approach
-A, rejected in the spec - a formula assumed correct would mask a
-confidently wrong region if either the assumed lens model or the camera's
-mounting rotation is off). Instead: ephemeris gives the astronomically
-EXACT (alt, az) for any timestamp (no calibration needed, ephem is already
-accurate) - what actually needs calibrating is the mapping from (alt, az)
-to a pixel position for THIS specific camera, and that mapping is built
-here purely from real observed data (see
-tools/skycalibration_collector.py), with an explicit refusal to answer for
-any query too far from what has actually been observed.
-
-This is a first iteration (see spec section 5/10 and the plan header this
-module was built under): lookup_pixel_position is deliberately the
-simplest safe thing that could work - nearest-neighbor within a distance
-cutoff - not the more sophisticated parametric fisheye model discussed as
-a possible future refinement once real accumulated data shows the need.
+lookup_pixel_position is a nearest-neighbor search within a distance cutoff.
 '''
 
 import csv
@@ -28,11 +15,8 @@ import os
 import ephem
 
 
-DEFAULT_MAX_LOOKUP_DISTANCE_DEG = 5.0  # initial default, not yet validated -
-    # how far (in the simple Euclidean alt/az distance below) a query
-    # position may be from the nearest real calibration sample before this
-    # refuses to answer. Revisit once real calibration data shows the
-    # actual nearest-neighbor pixel error at a given distance.
+DEFAULT_MAX_LOOKUP_DISTANCE_DEG = 5.0  # maximum (alt, az) distance in degrees between a
+    # query and the nearest sample; farther queries return None
 
 _CALIBRATION_CSV_HEADER = ["timestamp_utc", "body", "alt_deg", "az_deg", "pixel_x", "pixel_y"]
 
@@ -64,13 +48,8 @@ def moon_alt_az(dt_utc, lat, lon, elevation):
 
 def record_calibration_sample(csv_path, timestamp_utc_iso, body, alt_deg, az_deg, pixel_x, pixel_y):
     '''
-    Appends one calibration sample row to csv_path, writing the header
-    first if the file doesn't exist yet. Called from a cron job (see
-    tools/skycalibration_collector.py) - any write failure here (e.g. a
-    permissions or disk-space problem) is caught and reported as a
-    WARNING print rather than propagated, matching this project's
-    established "never a raw traceback out of a diagnostic/collector
-    tool" convention (see staticmask.py's own WARNING prints).
+    Appends one calibration sample row to csv_path (header written if the file is new).
+    Write failures are printed as a WARNING, not raised (it runs from a cron job).
     '''
     try:
         file_exists = os.path.isfile(csv_path)
@@ -100,26 +79,11 @@ def load_calibration_samples(csv_path, body):
 
 def lookup_pixel_position(alt_deg, az_deg, samples, max_distance_deg=DEFAULT_MAX_LOOKUP_DISTANCE_DEG):
     '''
-    Nearest-neighbor lookup among real calibration samples. Distance is a
-    simple Euclidean distance in (alt, az) degree-space, not a true
-    great-circle angular distance - a deliberate first-iteration
-    simplification. This distorts near the poles of that coordinate system
-    (alt near +/-90), but real sun/moon positions relevant to this camera's
-    sky-facing ROI stay well away from those poles, so the distortion is
-    not expected to matter in practice - not yet empirically confirmed.
+    Nearest-neighbor lookup among the calibration samples. The distance is Euclidean in
+    (alt, az) degree space, with the azimuth difference wrapped at 360 degrees.
 
-    Azimuth is handled as a circular coordinate: the distance is computed
-    using wrapped azimuth delta to correctly handle the 0°/360° wraparound
-    (e.g., az=359° is only 2° away from az=1°, not 358°).
-
-    Returns (pixel_x, pixel_y) of the nearest sample if within
-    max_distance_deg, else None - callers must treat None as "no confident
-    answer", falling back to whatever they did before this lookup existed
-    (see docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md
-    section 5's "no confident data -> don't guess" contract). No caller in
-    this plan consumes this yet; wiring it into live masking is a later
-    plan (spec section 6/7), once real accumulated data exists to validate
-    against.
+    Returns (pixel_x, pixel_y) of the nearest sample if within max_distance_deg, else
+    None ("no confident answer": callers must not guess).
     '''
     if not samples:
         return None

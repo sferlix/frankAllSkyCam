@@ -1,13 +1,8 @@
 '''
-Unit tests for crontab._pausedLines - the pure line-selection logic behind
-pauseCaptureJobs()/resumeCaptureJobs() (see PAUSABLE_JOB_SUBSTRINGS for what
-gets paused and why: a long-running exclusive-camera-access operation like
-capturedarks.py needs the regular capture job AND the watchdog paused, not
-just the capture job, or the watchdog can reboot the Pi mid-session). No
-real crontab involved - the read/write I/O (_currentCrontabLines,
-_installCrontabLines) is deliberately left untested here, matching this
-project's convention of unit-testing extracted pure logic rather than the
-system calls around it.
+Unit tests for crontab._pausedLines, the line selection behind
+pauseCaptureJobs()/resumeCaptureJobs() (see PAUSABLE_JOB_SUBSTRINGS): the capture job
+and the watchdog are paused, other jobs are not. No real crontab is involved; the
+read/write I/O is not tested.
 '''
 
 from frankAllSkyCam import crontab
@@ -30,9 +25,8 @@ def test_comments_out_the_watchdog_line():
 
 
 def test_leaves_other_managed_jobs_running():
-    # startrail, timelapse, cleanup, calculateEphem, generateExtraData -
-    # none of these compete for the camera or watch for capture staleness,
-    # so none of them should be touched
+    # startrail, timelapse, cleanup, calculateEphem and generateExtraData don't use the
+    # camera or watch for capture staleness, so none of them is touched
     lines = [
         "50 7 * * * python3 -m frankAllSkyCam.startrail >log/startrail.log 2>&1 #frankAllSkyCam-managed\n",
         "0 8 * * * python3 -m frankAllSkyCam.timelapse >log/timelapse.log 2>&1 #frankAllSkyCam-managed\n",

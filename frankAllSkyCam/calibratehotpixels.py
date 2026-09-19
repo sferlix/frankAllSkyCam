@@ -1,21 +1,16 @@
 '''
 One-off calibration tool for hotpixels.py.
 
-Finds pixel coordinates that recur across several night frames from the
-same camera - fixed sensor defects - as opposed to genuine stars,
-satellites, planes or cosmic ray hits, which don't repeat at the same
-position frame to frame. Not part of the automated per-capture pipeline;
-run manually, occasionally, per install, against that camera's own
-already-watermarked archived JPGs (frankAllSkyCam/img/<date>/*.jpg).
+Finds pixel coordinates that recur across several night frames of the same camera
+(fixed sensor defects, unlike stars, satellites or cosmic rays). Run manually, per
+install, on that camera's archived JPGs (frankAllSkyCam/img/<date>/*.jpg).
 
 Usage:
     python -m frankAllSkyCam.calibratehotpixels <folder-of-night-jpgs> \
         --layout brallo|pregola|none [--out hotpixels.json] \
         [--min-fraction 0.7] [--tolerance-px 6]
 
-Brallo and Pregola need separate runs (different sensor, different
-defects) and separate output files - never share a hotpixels.json between
-installs.
+Each sensor needs its own run and output file.
 '''
 
 import sys
@@ -27,15 +22,8 @@ import numpy as np
 import cv2
 from PIL import Image
 
-# text/logo/icon regions to exclude, measured directly off real frames from
-# each camera (pixel bounding boxes of the actual red-channel text glyphs,
-# not eyeballed) - a first pass reused this session's ad hoc compare_dots*
-# boxes and produced false "recurring hot pixels" that were actually just
-# watermark text edges peeking past too-tight cutoffs (e.g. the bottom of
-# "Clouds: 0%" past y=335, or "Night: ...+1" past x=230) - text is static
-# and repeats every frame exactly like a real defect would, so an
-# under-sized exclusion box is worse than no box at all for this tool.
-# Margins here are generous on purpose.
+# text/logo/icon regions of the watermark to exclude, as pixel bounding boxes per camera.
+# Watermark text repeats in every frame like a real defect, so the boxes are generous.
 LAYOUTS = {
     "brallo": [
         (slice(0, 365), slice(0, 465)),

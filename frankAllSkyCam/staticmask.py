@@ -1,38 +1,20 @@
 '''
-Auto-generated static obstruction mask - replaces starscalc.py's two dynamic,
-per-frame obstruction heuristics (_obstruction_mask for night, brightness-
-based; _day_obstruction_mask for day, texture-based) with a single mask
-learned once from real night captures and reused for both. See
-docs/superpowers/specs/2026-09-14-cloud-detection-rework-design.md section 4
-for the full rationale (the dynamic day-side texture heuristic was confirmed
-this session to also flag real cloud edges as "foliage", not just trees).
+Static obstruction mask: one mask learned from recent night captures (see
+generate_mask.py) and used by starscalc.py for both day and night, in place of the
+per-frame obstruction heuristics.
 
-Must be generated from NIGHT frames specifically, not day frames: the
-darkness threshold below only works because night foliage reads near-black
-against a sky that always retains some airglow/light-pollution floor (the
-same physical basis starscalc._obstruction_mask already relies on) - daytime
-foliage is lit, not dark, so a day-frame stack would not reliably separate
-obstruction from sky by darkness. Obstruction geometry itself is time-of-day
-independent (a tree is a tree at any hour), so a mask learned from night
-frames is valid to reuse for the day branch too.
+It must be generated from night frames: night foliage is near-black against a sky
+that keeps an airglow/light-pollution floor, which is what the darkness threshold
+relies on. Obstruction geometry does not change with the hour, so the mask is valid
+by day too.
 
-Mask polarity matches starscalc._obstruction_mask's existing convention:
-255 = obstruction (excluded), 0 = clear sky. This is the OPPOSITE of
-roi_mask's 255=included convention - deliberate, so this module's output is
-a drop-in replacement at every existing obstruction-mask call site with no
-change to the surrounding "sky[obstruction==255]=0" logic.
+Polarity matches starscalc._obstruction_mask: 255 = obstruction (excluded),
+0 = clear sky - the opposite of roi_mask, so it drops in where
+"sky[obstruction == 255] = 0" is applied.
 
-KNOWN LIMITATION (accepted for this iteration, not an oversight): the frames
-this mask is calibrated from are read from disk post-processing (see
-generate_mask.py), i.e. after __main__.py has already burned in fixed-
-position overlays - logo, compass, planet icons - pasted at configured pixel
-coordinates. Because these overlay elements sit at the same pixel location
-in every frame, they survive the median stack intact just like a real
-obstruction does, so any overlay element that falls inside the analyzed ROI
-becomes a permanent excluded region in the generated mask. A full fix would
-require capturing pre-watermark frames, which is a larger architectural
-change out of scope for this iteration; this module and generate_mask.py's
-CLI output are expected to be used with that limitation understood.
+Known limitation: the frames are read after __main__.py has burned in the logo,
+compass and planet icons; an overlay element inside the analyzed ROI survives the
+median stack and becomes a permanently excluded region.
 '''
 
 import os
@@ -40,43 +22,18 @@ import os
 import cv2
 import numpy as np
 
-MASK_BLUR_SIGMA = 3       # initial default, not yet validated against real
-                           # masks - removes hot-pixel/sensor-noise-scale
-                           # variation from the median stack before
-                           # thresholding, without blurring real obstruction
-                           # edges (much smaller than GUARD_BAND_PX=41 used
-                           # elsewhere in starscalc.py for edge margins).
-                           # Revisit once real generated masks have been
-                           # visually reviewed (see spec section 5/10 - this
-                           # whole rework is explicitly iterative).
-MASK_SMOOTH_KERNEL = 15   # initial default, same caveat as MASK_BLUR_SIGMA -
-                           # closes small gaps and removes small noise blobs
-                           # in the thresholded mask, smaller than
-                           # GUARD_BAND_PX so it doesn't over-erode real
-                           # obstruction boundaries.
-MAX_PLAUSIBLE_EXCLUDED_PCT = 60.0  # initial, unvalidated default, same caveat
-                           # as MASK_BLUR_SIGMA/MASK_SMOOTH_KERNEL - Otsu's
-                           # threshold always finds SOME bimodal split, even
-                           # on a stack with no real obstruction at all
-                           # (fisheye vignetting near the ROI edge is a
-                           # plausible false split). A mask excluding more
-                           # than this fraction of its own pixels is treated
-                           # as implausible and rejected, both at generation
-                           # time (generate_mask.py) and at load time
-                           # (get_static_mask below), so a bad mask can never
-                           # be worse than the dynamic-mask fallback. Revisit
-                           # once real generated masks have been visually
-                           # reviewed (see spec section 5/10).
+MASK_BLUR_SIGMA = 3       # blur applied to the median stack: removes hot-pixel/noise-scale
+                           # variation without blurring obstruction edges
+MASK_SMOOTH_KERNEL = 15   # closes small gaps and removes small blobs in the thresholded mask
+MAX_PLAUSIBLE_EXCLUDED_PCT = 60.0  # a mask excluding more than this % is rejected, at generation
+                           # and at load (Otsu always finds some split, even with no obstruction)
 
 
 def generate_mask(gray_images, roi):
     '''
-    gray_images: list of 2D grayscale np.ndarray, all the same shape, all
-    real NIGHT frames (see module docstring for why).
-    roi: the circular ROI mask (roi_mask's output, 255=inside/analyzed).
-
-    Returns a uint8 mask, same shape as the inputs, 255=obstruction
-    (excluded), 0=clear sky - see module docstring for polarity rationale.
+    gray_images: 2D grayscale arrays of the same shape, all night frames.
+    roi: circular ROI mask (roi_mask output, 255 = inside).
+    Returns a uint8 mask of the same shape: 255 = obstruction, 0 = clear sky.
     '''
     if not gray_images:
         raise ValueError("generate_mask requires at least one image")
@@ -85,10 +42,8 @@ def generate_mask(gray_images, roi):
     median = np.median(stacked, axis=0).astype(np.uint8)
     blurred = cv2.GaussianBlur(median, (0, 0), sigmaX=MASK_BLUR_SIGMA)
 
-    # Otsu's threshold computed from ROI-restricted pixel values only - the
-    # full frame includes the pitch-black region outside the fisheye circle,
-    # which would skew the bimodal fit away from the real obstruction/sky
-    # split inside the ROI.
+    # Otsu's threshold is computed from ROI pixels only: the black area outside the fisheye
+    # circle would skew the split
     roi_values = blurred[roi == 255].reshape(-1, 1)
     otsu_thresh, _ = cv2.threshold(roi_values, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
@@ -118,14 +73,10 @@ def load_mask(path):
 
 def get_static_mask(shape, path):
     '''
-    shape: the (height, width) of the current frame being analyzed.
-    path: where the generated mask is expected to live (see
-    fileManager.getStaticMaskFileName()).
-
-    Returns the loaded mask if present and shape-compatible, else None (the
-    caller in starscalc.py falls back to today's dynamic masks - a fresh
-    install with no generated mask yet, or one where the capture resolution
-    changed since the mask was generated, is never worse off than today).
+    shape: (height, width) of the frame being analyzed.
+    path: the generated mask (fileManager.getStaticMaskFileName()).
+    Returns the mask if present and matching the shape, else None (the caller falls
+    back to the per-frame heuristics).
     '''
     mask = load_mask(path)
     if mask is None:
@@ -135,13 +86,9 @@ def get_static_mask(shape, path):
               " does not match image shape " + str(shape) + " - ignoring, falling back")
         return None
 
-    # Plausibility guard: get_static_mask only receives the mask array, not
-    # the ROI it was generated from, so we use the fraction of ALL pixels in
-    # the mask that are 255 as a practical proxy for "fraction of the ROI
-    # excluded" (the mask is 0 everywhere outside the ROI by construction, so
-    # this proxy is conservative - it never overstates the excluded ROI
-    # fraction). See MAX_PLAUSIBLE_EXCLUDED_PCT above for why this guard
-    # exists.
+    # Plausibility guard: the mask alone is available here, so the fraction of 255 pixels of
+    # the whole mask stands in for the excluded ROI fraction (it never overstates it, the
+    # mask is 0 outside the ROI)
     excluded_pct = 100.0 * np.count_nonzero(mask == 255) / mask.size
     if excluded_pct > MAX_PLAUSIBLE_EXCLUDED_PCT:
         print("WARNING: static mask excludes " + ("%.1f" % excluded_pct) +

@@ -54,12 +54,9 @@ def test_compute_raw_next_none_when_last_exposure_zero():
 
 
 def test_compute_raw_next_caps_extreme_upward_extrapolation():
-    # real dusk-sequence bug numbers: an ISP-driven frame at exposure=0.06s
-    # measured mean=1.6 (near-black - dominated by sensor noise floor, not
-    # real scene signal). The plain ratio (0.06*30/1.6 = 1.125s, an ~18.75x
-    # jump) is what produced a real overexposed frame (mean 53.9 instead of
-    # the target 30) one minute later - capped here to at most
-    # MAX_EXPOSURE_STEP_FACTOR (5x) over last_exposure instead.
+    # an ISP-driven frame at exposure=0.06s measured mean=1.6 (near-black, mostly noise).
+    # The plain ratio (0.06*30/1.6 = 1.125s, 18.75x) is capped at MAX_EXPOSURE_STEP_FACTOR
+    # (5x) over last_exposure.
     result = autoexposure.compute_raw_next(0.06, 1.6, target_mean=30.0)
 
     assert result == pytest.approx(0.06 * autoexposure.MAX_EXPOSURE_STEP_FACTOR)
@@ -67,10 +64,8 @@ def test_compute_raw_next_caps_extreme_upward_extrapolation():
 
 
 def test_compute_raw_next_does_not_cap_downward_steps():
-    # a badly overexposed/clipped previous frame needs to be free to cut
-    # exposure hard, however large the downward ratio - only growth is
-    # capped (see test_getExposure_cuts_harder_when_previous_frame_was_saturated,
-    # which needs an ~7.6x downward step to go through uncapped)
+    # a clipped previous frame may cut the exposure by any factor: only growth is capped
+    # (the saturation test below needs a ~7.6x downward step)
     result = autoexposure.compute_raw_next(1.0, 229.0, target_mean=30.0)
 
     assert result == pytest.approx(1.0 * (30.0 / 229.0))
@@ -123,24 +118,16 @@ def test_should_use_isp_true_when_no_state_file(appPath):
 
 
 def test_should_use_isp_true_when_raw_next_below_floor(appPath):
-    # a twilight-bright previous frame: last_exposure=1.0s produced mean=229
-    # (this mirrors the real overexposed bug frame) - the honest, unclamped
-    # prediction is 1.0*(30/229) =~ 0.13s, well under the 1.0s floor, so the
-    # ISP - not the fixed-shutter algorithm - should still be driving capture
+    # a twilight-bright previous frame (1.0s gave mean=229): the unclamped prediction
+    # 1.0*(30/229) =~ 0.13s is under the 1.0s floor, so the ISP keeps driving
     write_state(appPath, exposure_secs=1.0, mean=229.0)
     assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
 
 
 def test_should_use_isp_stays_true_after_a_near_black_isp_frame(appPath):
-    # regression for the real twilight-oscillation bug: an ISP-driven
-    # capture at exposure=0.06s measured mean=1.6 (real dusk-sequence
-    # numbers). Without the upward step cap, the plain-ratio prediction
-    # (1.125s) sat above the 1.0s floor, flipping should_use_isp() to False
-    # and handing the very next capture to a fixed-shutter exposure
-    # extrapolated off a noise-floor-dominated sample - which is exactly
-    # what produced the real overexposed frame (mean 53.9 instead of
-    # target 30) this state is modeling. With the cap, raw_next stays at
-    # 0.3s, still under the floor, so the ISP keeps driving instead.
+    # an ISP-driven capture at 0.06s measured mean=1.6. Without the upward step cap the
+    # plain ratio (1.125s) would exceed the 1.0s floor and hand the next capture to a fixed
+    # shutter; with the cap raw_next stays at 0.3s, under the floor, so the ISP keeps driving.
     write_state(appPath, exposure_secs=0.06, mean=1.6)
     assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
 
@@ -153,50 +140,28 @@ def test_should_use_isp_false_when_raw_next_at_or_above_floor(appPath):
 
 
 def test_should_use_isp_stays_stuck_across_a_real_frame_duration_ceiling(appPath):
-    # regression for the v46 real dawn/dusk sequences (2026-09-09): the
-    # ISP-harvested exposure hard-caps around 0.06s on this imx477 pipeline
-    # (confirmed on real hardware afterwards - baseline, --exposure long,
-    # and --timeout 5000 all came back bit-identical: ExposureTime=60000,
-    # AnalogueGain=4.39, AeLocked=false - it's a genuine ceiling, not a
-    # convergence-time issue). That harvested (exposure, mean) pair is also
-    # from a different AnalogueGain regime than fixed-shutter night capture
-    # uses (--gain 10), so feeding it into compute_raw_next's ratio is a
-    # category error on top of the ceiling. Whatever the ceiling's cause,
-    # this asserts should_use_isp() has no self-correcting mechanism against
-    # a stuck ISP-sourced reading: fed the actual recorded state at any
-    # point in the stuck run, it keeps deferring to the ISP every time. That
-    # is still true and expected of should_use_isp() in isolation - the fix
-    # is not here, it's the sun-altitude backstop in __main__.py's
-    # twilight_isp_mode gate (ae_twilight_isp_backstop_deg), which stops
-    # calling should_use_isp() at all once the sun is past astronomical
-    # twilight, exactly because this function has no way to recover from a
-    # stuck ISP-sourced state on its own.
+    # a stuck ISP-sourced state (harvested exposure ~0.06s, at a different gain than
+    # fixed-shutter capture) keeps deferring to the ISP: should_use_isp has no way out of it
+    # by itself. The escape is the sun-altitude backstop in __main__.py
+    # (ae_twilight_isp_backstop_deg), which stops calling it past astronomical twilight.
     for mean_at_ceiling in (1.026, 13.703, 50.787):
         write_state(appPath, exposure_secs=0.06, mean=mean_at_ceiling)
         assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is True
 
 
 def test_should_use_isp_exits_cleanly_once_isp_reports_a_real_exposure(appPath):
-    # once the capture-command fix lets the ISP report a genuine, unclamped
-    # exposure again (same real sequence, the last good fixed-shutter frame
-    # at 06:11: exposure=1.93s, measured mean=34.90, close to target 30),
-    # the crossover must hand back to fixed-shutter control instead of
-    # re-entering twilight_isp_mode - confirms MAX_EXPOSURE_STEP_FACTOR's
-    # upward cap (needed for the dusk-oscillation bug, see
-    # test_should_use_isp_stays_true_after_a_near_black_isp_frame) does not
-    # also trap a *correctly*-exposed harvested ISP frame behind the floor.
+    # a correctly exposed harvested ISP frame (last fixed-shutter frame: exposure=1.93s,
+    # mean=34.90, close to target 30) must hand back to fixed-shutter control: the upward
+    # step cap must not trap it behind the floor
     write_state(appPath, exposure_secs=1.93, mean=34.904)
     assert autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0) is False
 
 
 def test_should_use_isp_applies_same_saturation_adjustment_as_getExposure(appPath):
-    # mid-night, a cloud reflecting light pollution saturates a 20s exposure
-    # (clip_frac=0.6, mean=255). Chosen so the PLAIN ratio (20*30/255 ~=
-    # 2.35s) sits ABOVE the floor - should_use_isp would wrongly return
-    # False without the saturation adjustment - while the adjusted value
-    # (2.35 / (1+0.6*8) ~= 0.41s) sits BELOW it. True here is only
-    # explicable if should_use_isp actually applied the same adjustment
-    # getExposure does, not a divergent plain-ratio-only check.
+    # a cloud reflecting light pollution saturates a 20s exposure (clip_frac=0.6, mean=255).
+    # The plain ratio (20*30/255 = 2.35s) is above the floor, the saturation-adjusted value
+    # (2.35 / (1+0.6*8) = 0.41s) is below it: True only if should_use_isp applies the same
+    # adjustment as getExposure.
     write_state(appPath, exposure_secs=20.0, mean=255.0, clip_frac=0.6)
 
     result = autoexposure.should_use_isp(appPath, target_mean=30.0, min_exposure_secs=1.0,
@@ -216,13 +181,9 @@ def test_getExposure_plain_ratio_when_not_saturated(appPath):
 
 
 def test_getExposure_cuts_harder_when_previous_frame_was_saturated(appPath):
-    # real bug-frame numbers: exposure floored to 1.0s, measured clip_frac
-    # 0.42 (measured on the actual attached overexposed capture at
-    # roi_percent=70, clip threshold 250). The plain ratio alone
-    # (1.0 * 30/229 =~ 0.131s) still way overshoots what the frame needed
-    # (~0.03-0.045s per sqmexp.csv at that SQM) because a clipped mean
-    # carries no information about how far past 255 the true mean was -
-    # the severity term is what pulls the estimate back down.
+    # exposure 1.0s, clip_frac 0.42: the plain ratio (1.0*30/229 = 0.131s) overshoots what
+    # the frame needed, since a clipped mean says nothing about how far past 255 it was;
+    # the severity term pulls the estimate down
     write_state(appPath, exposure_secs=1.0, mean=229.0, clip_frac=0.42)
     plain_ratio = 1.0 * (30.0 / 229.0)
 
@@ -238,9 +199,8 @@ def test_getExposure_cuts_harder_when_previous_frame_was_saturated(appPath):
 
 
 def test_getExposure_ignores_small_clip_frac_from_a_bright_point_source(appPath):
-    # a full moon in the ROI clips a couple of pixels (real luna.jpg sample
-    # measured clip_frac ~0.002) without the frame being genuinely
-    # overexposed - must not trigger the harsh saturation cut
+    # a full moon in the ROI clips a few pixels (clip_frac ~0.002) without the frame being
+    # overexposed: no saturation cut
     write_state(appPath, exposure_secs=6.0, mean=45.0, clip_frac=0.002)
     ex = autoexposure.getExposure(11.0, esp_secs=60.0, appPath=appPath,
                                    target_mean=30.0, min_exposure_secs=1.0,
@@ -250,7 +210,7 @@ def test_getExposure_ignores_small_clip_frac_from_a_bright_point_source(appPath)
 
 
 def test_getExposure_backward_compatible_with_state_missing_clip_frac(appPath):
-    # state files written before this change have no "clip_frac" key at all
+    # state files without a "clip_frac" key still work
     write_state(appPath, exposure_secs=6.0, mean=25.0)  # no clip_frac
     ex = autoexposure.getExposure(11.0, esp_secs=60.0, appPath=appPath,
                                    target_mean=30.0, min_exposure_secs=1.0)

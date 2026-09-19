@@ -35,16 +35,17 @@ moonpath = appPath + "/png/moon.png" #Input (full moon) image file path
 phasepath = appPath+ "/png/phase.png" #Output image file path
 
 DAY = 1.0/29.33
+# (upper lunation bound, overlay label, full name)
 MOONPHASE = [
-    (0.0/4.0 + DAY, 'New'),
-    (1.0/4.0 - DAY, 'Waxing Cr'),
-    (1.0/4.0 + DAY, '1st Q'),
-    (2.0/4.0 - DAY, 'Waxing Gib'),
-    (2.0/4.0 + DAY, 'Full'),
-    (3.0/4.0 - DAY, 'Waning Gib'),
-    (3.0/4.0 + DAY, 'Last Q'),
-    (4.0/4.0 - DAY, 'Waning Cr'),
-    (4.0/4.0,       'New'),
+    (0.0/4.0 + DAY, 'New', 'New Moon'),
+    (1.0/4.0 - DAY, 'Waxing Cr', 'Waxing Crescent'),
+    (1.0/4.0 + DAY, '1st Q', 'First Quarter'),
+    (2.0/4.0 - DAY, 'Waxing Gib', 'Waxing Gibbous'),
+    (2.0/4.0 + DAY, 'Full', 'Full Moon'),
+    (3.0/4.0 - DAY, 'Waning Gib', 'Waning Gibbous'),
+    (3.0/4.0 + DAY, 'Last Q', 'Last Quarter'),
+    (4.0/4.0 - DAY, 'Waning Cr', 'Waning Crescent'),
+    (4.0/4.0,       'New', 'New Moon'),
 ]
 RANGES = [x[0] for x in MOONPHASE]
 
@@ -65,14 +66,8 @@ def calculate(dt):
    sun = ephem.Sun(mySite)
    moon = ephem.Moon(mySite)
 
-   # bound to mySite (lat/lon/elevation/date) rather than a bare, unbound
-   # ephem.Moon() - the previous code called .compute() with no observer or
-   # date at all, so moon_phase/elong silently used ephem's "right now"
-   # instead of dt/mySite.date. Dormant in practice (this only ever runs
-   # with dt == datetime.now()), but wrong if calculate() is ever called
-   # for another moment (a backfill, a test) - and autoexposure's moon-aware
-   # exposure scaling (see __main__.py) needs this to be genuinely
-   # date-accurate, not coincidentally so.
+   # the Moon is bound to mySite (lat/lon/elevation/date), so its phase and elongation
+   # refer to dt
    phase = moon.moon_phase
    a = moon.elong
    mp = 1 - phase
@@ -142,11 +137,9 @@ def calculate(dt):
       "ora": dt.astimezone(mytz).strftime("%H:%M"),
       "isTimelapse": (sf == "YTL" or sf == "NTL"),
       "sunAlt": sunAlt,
-      # numeric moon altitude (degrees, negative below horizon) and
-      # illuminated fraction (0=new, 1=full) - autoexposure's moon-aware
-      # target-mean scaling (see __main__.py/autoexposure.py) needs both as
-      # plain numbers; moonPhase/mp below are display-string/image-shading
-      # values derived from the same "phase", not substitutes for this.
+      # numeric moon altitude (degrees, negative below the horizon) and illuminated
+      # fraction (0=new, 1=full), used by autoexposure's moon-aware target scaling;
+      # moonPhase/mp below are display values
       "moonAlt": moonAlt,
       "moonIllumination": phase,
       "suffisso": sf,
@@ -157,13 +150,15 @@ def calculate(dt):
       "sunSet": ss,
       "nightStart": ns,
       "nightEnd": ne,
-      # tz-aware datetimes (as opposed to the "HH:MM+1"-style display
-      # strings above, meant for the on-image overlay) - weatherexport.py
-      # reformats these to ISO8601 UTC, matching weather.json's own
-      # "timestamp" field, rather than a +1/-1 suffixed local string a
-      # generic JSON consumer can't parse.
+      # tz-aware datetimes (the strings above are display strings for the overlay);
+      # skystatus.py writes them as ISO8601 UTC
       "nightStartDt": nStart,
       "nightEndDt": nEnd,
+      "sunRiseDt": sRise,
+      "sunSetDt": sSet,
+      "moonRiseDt": moon_next_rising.astimezone(mytz),
+      "moonSetDt": moon_setting.astimezone(mytz),
+      "moonPhaseName": MOONPHASE[lun_phase][2],
       "moonPhase": str(int(phase*100))+"% - " + human_phase,
       "mp": mp
       }
@@ -244,11 +239,9 @@ def get_phase_on_day(ddata):
     """Returns a floating-point number from 0-1. where 0=new, 0.5=full, 1=new"""
     date = ephem.Date(ddata)
 
-    # The following extract the percent time between one new moon and the next
-    # This corresponds (somewhat roughly) to the phase of the moon.
-    # Note that there is a ephem.Moon().phase(), but this returns the
-    # percentage of the moon which is illuminated. This is not really what we
-    # want.
+    # The following extract the percent time between one new moon and the next, i.e.
+    # the phase of the moon. ephem.Moon().phase is the illuminated percentage, which is
+    # not what is needed here.
     nnm = ephem.next_new_moon(date)
     pnm = ephem.previous_new_moon(date)
     lunation = (date-pnm)/(nnm-pnm)

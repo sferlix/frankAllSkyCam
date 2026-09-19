@@ -28,13 +28,8 @@ timeZone = str(config['site']['time_zone'])
 appPath = os.path.expanduser("~") + "/frankAllSkyCam/"
 logFolder = appPath + str(config['system']['logFolder'])
 
-# tags every cron line this script writes, so readCrontab() can recognize
-# and replace exactly (only) its own lines on a rerun - a bare substring
-# check on "frankAllSkyCam" also matched unrelated user cron entries that
-# merely mentioned the name (e.g. a personal script path), silently
-# deleting them. A trailing "#comment" is safe here: cron runs each line's
-# command through a shell, and both sh and bash treat a bare "#" as
-# starting a comment there, same as in any shell script.
+# tags every cron line this script writes, so readCrontab() replaces exactly its own lines
+# on a rerun and leaves unrelated user entries alone
 MARKER = "#frankAllSkyCam-managed"
 
 def getTimes():
@@ -86,28 +81,20 @@ def getTimes():
               for element in linesToAdd:
                   f.write(element)
 
-              # mat/ser split the day into 3 hour ranges below - guard the
-              # edges (mat==0, or mat>ser-1) so an extreme-latitude dawn/dusk
-              # time can't render an invalid range like "0--1" (crontab
-              # rejects the whole file on invalid syntax, see below)
+              # mat/ser split the day into 3 hour ranges: guard the edges so an extreme-latitude
+              # dawn/dusk can't produce an invalid range like "0--1" (crontab rejects the whole file)
               if mat <= ser - 1:
                  f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
-              # night hours run every 2 min, not every 1: a night capture cycle
-              # (exposure up to esp_secs=60s, plus libcamera/SQM/watermark/FTP
-              # overhead) routinely takes well over 60s end to end - measured
-              # 119s on one production run - so a 1-min interval just queues
-              # every invocation behind the camera lock instead of ever
-              # actually running back-to-back. Daytime (above) is exposure=0
-              # (near-instant), so it keeps */1.
+              # night hours run every 2 min: a night cycle (exposure up to esp_secs plus overhead)
+              # often takes over 60s, so a 1-min interval would only queue runs behind the camera
+              # lock. Daytime has near-instant exposure and keeps */1.
               f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
               if mat >= 1:
                  f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1 " + MARKER + "\n")
-              # generateExtraData.py lives outside the package (in ~/frankAllSkyCam/tools/,
-              # user-editable, never overwritten by a package upgrade) so it's invoked by
-              # absolute path rather than -m
-              # also handles dew heater switching (merged from the former checkdew.py,
-              # to avoid polling the same temp/dewpoint sensors from two separate jobs)
+              # generateExtraData.py lives in ~/frankAllSkyCam/tools/ (user-editable, not replaced by
+              # upgrades), so it is invoked by absolute path rather than -m. It also switches the
+              # dew heater.
               f.write("*/5 * * * * python3 " + appPath + "tools/generateExtraData.py >" + logFolder + "/generateExtraData.log 2>&1 " + MARKER + "\n")
               f.write("0 1 * * * python3 -m frankAllSkyCam.allskycamdelete >" + logFolder + "/allskycamdelete.log 2>&1 " + MARKER + "\n")
               f.write("50 7 * * * python3 -m frankAllSkyCam.startrail >" + logFolder + "/startrail.log 2>&1 " + MARKER + "\n")
@@ -116,13 +103,8 @@ def getTimes():
               f.write("0 0 1 1 * python3 -m frankAllSkyCam.crontab >" + logFolder + "/crontab.log 2>&1 " + MARKER + "\n")
               f.close()
 
-              # crontab <file> already atomically replaces the whole crontab
-              # in one step - it was preceded by "crontab -r" (clear first),
-              # which left a window where a syntax error in the new file
-              # (crontab refuses the whole file, doesn't apply partially)
-              # would leave the box with zero cron jobs instead of the old
-              # ones. Just installing the new file directly means a bad file
-              # fails safe, leaving the previous crontab in place.
+              # install the new file directly: crontab replaces the whole crontab atomically and
+              # rejects a malformed file, so a bad file leaves the previous crontab in place
               os.system("crontab ./AllSkyCrontab.txt")
               os.system("rm ./AllSkyCrontab.txt")
 
@@ -136,11 +118,8 @@ def getTimes():
     return
 
 def _is_legacy_line(line):
-    # one-time migration only: lines from before MARKER existed, still
-    # narrower than the old bare "frankAllSkyCam" check - "-m frankAllSkyCam"
-    # (module invocation) and this install's own generateExtraData.py path
-    # are specific enough that an unrelated user cron entry is very unlikely
-    # to collide, unlike the plain project name appearing anywhere.
+    # migration: recognizes lines written before MARKER existed ("-m frankAllSkyCam" and this
+    # install's own generateExtraData.py path)
     return ("-m frankAllSkyCam" in line
             or (appPath + "tools/generateExtraData.py") in line
             or line.startswith("#Crontab generated by frankAllSkyCam"))
@@ -160,15 +139,8 @@ def readCrontab():
             break
 
         if MARKER not in line and not _is_legacy_line(line):
-            # keep this line - it isn't one of ours. Was a bare
-            # "frankAllSkyCam" substring check, which also matched (and
-            # silently deleted) any unrelated user cron entry that happened
-            # to mention the project name anywhere (e.g. a personal script
-            # under ~/frankAllSkyCam/tools/). MARKER is written on every
-            # line this script generates (see getTimes() above), so this
-            # now only ever matches our own lines - _is_legacy_line() is
-            # just a one-time bridge so pre-MARKER installs don't end up
-            # with every job duplicated on their first regeneration.
+            # keep this line: it isn't one of ours. Only MARKER lines (and legacy lines, see
+            # _is_legacy_line) are replaced.
             crontabLines.append(line)
 
 
@@ -177,20 +149,13 @@ def readCrontab():
     return crontabLines
 
 
-# substrings identifying the specific cron lines a long-running exclusive-
-# camera-access operation (e.g. capturedarks.py) needs paused - deliberately
-# narrower than MARKER alone, which also tags jobs safe to leave running
-# (allskycamdelete, startrail, timelapse, calculateEphem, generateExtraData):
-#   - the regular capture job itself ("python3 -m frankAllSkyCam >", note the
-#     trailing " >" so this doesn't also match "-m frankAllSkyCam.watchDog"
-#     etc. below) - would otherwise race the foreground operation for the
-#     camera
-#   - the watchdog ("-m frankAllSkyCam.watchDog") - reboots the Pi if no new
-#     frame has appeared within config.txt's rebootAfter minutes (15 by
-#     default); a real capturedarks.py session (multiple exposures x
-#     multiple frames each, some up to a minute long) can run close to or
-#     past that with the regular capture job paused, so the watchdog itself
-#     must be paused too, not just outlasted
+# substrings of the cron lines that must be paused during exclusive camera access
+# (e.g. capturedarks.py); other jobs (allskycamdelete, startrail, timelapse,
+# calculateEphem, generateExtraData) keep running:
+#   - the capture job ("python3 -m frankAllSkyCam >"; the trailing " >" keeps it from
+#     matching "-m frankAllSkyCam.watchDog"), which would race for the camera
+#   - the watchdog ("-m frankAllSkyCam.watchDog"), which reboots the Pi when no new
+#     frame appeared within rebootAfter minutes: a long session would trigger it
 PAUSABLE_JOB_SUBSTRINGS = ("python3 -m frankAllSkyCam >", "-m frankAllSkyCam.watchDog")
 
 
@@ -203,9 +168,8 @@ def _currentCrontabLines():
 
 
 def _installCrontabLines(lines):
-    # same "write to a temp file, then `crontab <file>`" pattern getTimes()
-    # itself uses (see its own comment above) - crontab refuses a malformed
-    # file as a whole rather than applying it partially, so this fails safe
+    # same temp file + `crontab <file>` pattern as getTimes(): a malformed file is
+    # rejected as a whole, so this fails safe
     tmp_path = appPath + "_tmp_crontab_install.txt"
     with open(tmp_path, "w") as f:
         f.writelines(lines)
@@ -215,11 +179,9 @@ def _installCrontabLines(lines):
 
 def _pausedLines(lines):
     '''
-    Pure transform: comments out (never deletes) any line matching
-    PAUSABLE_JOB_SUBSTRINGS, leaves every other line - including one that's
-    already commented out - untouched. Split out from pauseCaptureJobs()
-    purely so this selection logic can be unit tested without a real
-    crontab.
+    Pure transform: comments out (never deletes) the lines matching
+    PAUSABLE_JOB_SUBSTRINGS and leaves every other line untouched. Separate from
+    pauseCaptureJobs() so it can be unit tested without a crontab.
     '''
     return [
         "#" + line if (not line.startswith("#") and
@@ -231,13 +193,9 @@ def _pausedLines(lines):
 
 def pauseCaptureJobs():
     '''
-    Comments out (never deletes) this install's regular capture + watchdog
-    cron lines - see PAUSABLE_JOB_SUBSTRINGS for exactly which and why.
-    Every other scheduled job (startrail, timelapse, cleanup, ...) is left
-    running untouched. Returns the exact original crontab lines (not just
-    the paused ones), so the caller can restore the real prior state
-    verbatim afterward regardless of what else was going on - pass this
-    straight to resumeCaptureJobs() when done, in a finally block.
+    Comments out (never deletes) the capture and watchdog cron lines (see
+    PAUSABLE_JOB_SUBSTRINGS); other jobs keep running. Returns the original crontab
+    lines, to pass to resumeCaptureJobs() in a finally block.
     '''
     original = _currentCrontabLines()
     _installCrontabLines(_pausedLines(original))

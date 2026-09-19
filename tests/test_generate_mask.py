@@ -1,9 +1,8 @@
 '''
-Unit tests for generate_mask.py's frame-selection logic. Uses a temp
-directory of small synthetic JPEGs (not real captures) to test the
-day/night filtering and sampling-cap behavior in isolation from real image
-I/O and from staticmask.generate_mask's own math (already covered in
-tests/test_staticmask.py).
+Unit tests for generate_mask.py's frame selection, with a temp directory of small
+synthetic JPEGs: day/night filtering, the clear-sky filter and its skip window,
+sampling cap, folder/file-name filtering and shape filtering. The mask math itself is
+covered by tests/test_staticmask.py.
 '''
 
 import os
@@ -26,12 +25,8 @@ def test_select_calibration_frames_keeps_only_night_frames(tmp_path):
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     _write_frame(str(day_dir / "skycam_20260101_080000.jpg"), 200)  # well above DAYTIME_MEAN_THRESHOLD
-    # both below DAYTIME_MEAN_THRESHOLD AND CLOUD_BRIGHTNESS_LOW (33) - a
-    # uniform-gray synthetic frame has no known exposure_secs (matches a
-    # real archived frame - see MAX_CALIBRATION_CLOUD_PCT's own comment),
-    # so it's scored by the weaker brightness-only fallback; 40 used to be
-    # used here too, but reads as ~41% cloud under that fallback since the
-    # clear-sky filter was added - not what this test is checking
+    # both below DAYTIME_MEAN_THRESHOLD and CLOUD_BRIGHTNESS_LOW (33): a uniform synthetic
+    # frame has no known exposure_secs, so it is scored by the brightness-only fallback
     _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)
     _write_frame(str(day_dir / "skycam_20260101_020000.jpg"), 28)
 
@@ -63,9 +58,8 @@ def test_select_calibration_frames_returns_empty_when_none_found(tmp_path):
 
 
 def test_select_calibration_frames_ignores_startrail_composites(tmp_path):
-    # Finding 2: startrail.py's max-stacked composites land in the same
-    # img/YYYYMMDD/ folder and often read dark enough to pass the night
-    # check too - they must never be selected as calibration frames.
+    # startrail composites land in the same img/YYYYMMDD/ folder and can read dark enough
+    # to pass the night check: they must never be selected
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)
@@ -79,13 +73,8 @@ def test_select_calibration_frames_ignores_startrail_composites(tmp_path):
 
 
 def test_select_calibration_frames_ignores_non_daily_folders(tmp_path):
-    # Found via a real run against 84.33.110.109 (2026-09-14): img/ also
-    # holds user-curated archive folders (aurora/, aurora2/, startrails/,
-    # timelapses/) containing real skycam_*.jpg-named frames deliberately
-    # preserved outside the normal daily rotation - a glob that searches
-    # every subfolder of img/ (not just YYYYMMDD-named ones) pulls these
-    # in as if they were ordinary recent night frames. One (from Oct 2024)
-    # ended up driving a real generated mask before this fix.
+    # archive folders under img/ (aurora/, startrails/, ...) can hold skycam_*.jpg-named
+    # frames: only YYYYMMDD-named folders may be searched
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)
@@ -101,16 +90,9 @@ def test_select_calibration_frames_ignores_non_daily_folders(tmp_path):
 
 
 def test_select_calibration_frames_drops_cloudy_night_frames(tmp_path, capsys):
-    # regression for the 2026-09-18 mask review: a real generated mask had
-    # two large excluded regions that didn't follow the actual tree
-    # silhouette at all, sitting over open starfield - traced to real cloud
-    # cover in part of the (only ~3-4 night, per config.txt's
-    # days_retention) calibration set biasing the median the same way a
-    # real obstruction does. A uniform gray value well above
-    # CLOUD_BRIGHTNESS_LOW (33) reads as cloudy under the weaker
-    # "exposure unknown" fallback this archived-frame path uses (no known
-    # exposure_secs), same as a real thin/hazy frame would with no
-    # brightness reference to correct against.
+    # cloud in the calibration set biases the median stack like an obstruction does. A
+    # uniform gray well above CLOUD_BRIGHTNESS_LOW (33) reads as cloudy under the
+    # brightness-only fallback used for archived frames (no known exposure_secs).
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     _write_frame(str(day_dir / "skycam_20260101_010000.jpg"), 30)   # clear - kept
@@ -124,16 +106,10 @@ def test_select_calibration_frames_drops_cloudy_night_frames(tmp_path, capsys):
 
 
 def test_select_calibration_frames_fast_forwards_past_a_cloudy_stretch(tmp_path, capsys):
-    # a cloudy reading should fast-forward CALIBRATION_CLOUD_SKIP_MINUTES of
-    # real time ahead (checked via mtime) rather than re-scoring every
-    # frame in between - cloud cover persists over real time far more than
-    # it varies frame to frame (see CALIBRATION_CLOUD_SKIP_MINUTES's own
-    # comment for the real-data evidence). Frame timeline (mtime offsets in
-    # minutes from an arbitrary epoch): 0=clear (kept), 5=cloudy (dropped,
-    # triggers a 20-minute skip window -> resumes at 25), 10=would read
-    # clear but falls inside the skip window (never opened, silently
-    # missed - the accepted cost of the speedup), 30=clear and past the
-    # skip window (kept).
+    # a cloudy reading fast-forwards CALIBRATION_CLOUD_SKIP_MINUTES (checked via mtime).
+    # Timeline (mtime offsets in minutes): 0 = clear (kept), 5 = cloudy (dropped, skip
+    # window until 25), 10 = clear but inside the window (never opened), 30 = clear and
+    # past the window (kept).
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     base = 1_000_000  # arbitrary epoch reference; only relative offsets matter
@@ -159,9 +135,8 @@ def test_select_calibration_frames_fast_forwards_past_a_cloudy_stretch(tmp_path,
 
 
 def test_select_calibration_frames_drops_frames_with_mismatched_shape(tmp_path, capsys):
-    # Finding 4: a capture resolution change partway through the retention
-    # window must not crash np.stack later - frames whose shape doesn't
-    # match the modal shape are dropped here instead.
+    # frames whose shape differs from the most common one are dropped, so a resolution
+    # change cannot break np.stack later
     day_dir = tmp_path / "20260101"
     day_dir.mkdir()
     for i in range(5):

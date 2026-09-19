@@ -28,8 +28,7 @@ tl_vert = str(config['timelapse']['tl_vert'])
 framerate = str(config['timelapse']['framerate'])
 nightTL = str(config['timelapse']['nightTL'])=='True'
 fullTL = str(config['timelapse']['fullTL'])=='True'
-# optional - fallback() keeps this working on existing config.txt files that
-# predate this feature (no re-seeding)
+# optional: missing keys fall back to defaults
 smoothMotion = config.getboolean('timelapse', 'smoothMotion', fallback=True)
 deflicker = config.getboolean('timelapse', 'deflicker', fallback=True)
 ffmpeg1 = str(config['timelapse']['ffmpeg1'])
@@ -47,12 +46,9 @@ tz = ZoneInfo(time_zone)
 x = datetime.datetime.now(tz)
 
 def buildVideoFilter():
-    # scale uses lanczos rather than ffmpeg's default bilinear - it preserves
-    # small point sources (stars) better under resize. smoothMotion uses a
-    # plain tblend average (no framestep - keeps frame count/duration
-    # unchanged) rather than motion-compensated interpolation (minterpolate):
-    # true motion estimation is too slow for a Pi over hundreds of frames and
-    # tends to ghost/warp on noisy, low-contrast starfields anyway.
+    # scale uses lanczos (keeps small point sources, i.e. stars, better than the bilinear
+    # default). smoothMotion is a plain tblend average (frame count and duration
+    # unchanged), not minterpolate, which is too slow on a Pi and ghosts on noisy starfields.
     filters = ["scale=" + str(tl_horiz) + ":" + str(tl_vert) + ":flags=lanczos"]
     if smoothMotion:
        filters.append("tblend=average")
@@ -73,9 +69,8 @@ def launchFFmpeg(inputFile, outputFile):
     comando += buildVideoFilter()
     comando += '"'
     comando += " " + ffmpeg1
-    # NOTE: ffmpeg2/ffmpeg3 are appended as-is (expert use) - if they also
-    # set -vf/-filter:v, ffmpeg will error out on the duplicate flag; disable
-    # smoothMotion/deflicker in config.txt first if you need full control here
+    # NOTE: ffmpeg2/ffmpeg3 are appended as-is; if they also set -vf/-filter:v ffmpeg
+    # fails on the duplicate flag (disable smoothMotion/deflicker in config.txt first)
     comando += " " + ffmpeg2
     comando += " " + ffmpeg3
 

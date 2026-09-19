@@ -1,17 +1,12 @@
 '''
 Static hot-pixel correction.
 
-A small, fixed set of sensor defects survives every camera-parameter lever
-tried on frankAllSkyCam's red-dot regression (sensor mode, denoise, gain,
-contrast) because they are individual defective photosites, not exposure- or
-gain-driven noise - confirmed by the same pixel positions recurring across
-consecutive frames under identical settings. Parameter tuning can't remove
-them; only correcting the exact known coordinates can.
+A small fixed set of individual defective photosites is corrected at known
+coordinates (camera parameters cannot remove them).
 
-Opt-in via file presence: no hotpixels.json in appPath -> load() returns
-None -> applyToFile() is a no-op. Coordinates are specific to one physical
-sensor, so this file is never shipped in defaults/ and never shared between
-installs - each camera gets its own, produced by calibratehotpixels.py.
+Opt-in by file: without hotpixels.json in appPath load() returns None and
+applyToFile() does nothing. The coordinates belong to one physical sensor, so the file
+is never shipped in defaults/; produce it per install with calibratehotpixels.py.
 '''
 
 import os
@@ -66,11 +61,9 @@ def correctImage(image, coords, radius=2):
 
 def applyToFile(jpg_file_name, appPath):
     '''
-    Loads appPath/hotpixels.json (if any), corrects jpg_file_name in place,
-    and returns True if a correction was applied. Must run before any
-    watermark/logo/text overlay is drawn onto jpg_file_name (same
-    requirement as autoexposure.recordExposureResult), since the
-    coordinates are calibrated against the raw captured frame.
+    Loads appPath/hotpixels.json (if any), corrects jpg_file_name in place and returns
+    True if a correction was applied. Must run before any overlay is drawn: the
+    coordinates refer to the raw captured frame.
     '''
     calibration = load(appPath)
     if calibration is None:
@@ -90,9 +83,7 @@ def applyToFile(jpg_file_name, appPath):
         return False
 
     corrected = correctImage(image, coords)
-    # starscalc/autoexposure/drawtext all re-read this file from disk rather
-    # than taking an in-memory array, so this write can't be avoided - but
-    # quality 100 (vs cv2's default ~95) keeps it as close to lossless as a
-    # JPEG re-encode gets, since the final watermark save re-encodes again.
+    # starscalc/autoexposure/drawtext re-read the file from disk; quality 100 keeps the
+    # re-encode near-lossless
     cv2.imwrite(jpg_file_name, corrected, [cv2.IMWRITE_JPEG_QUALITY, 100])
     return True

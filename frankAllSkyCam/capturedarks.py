@@ -1,26 +1,16 @@
 '''
-One-off tool to build a master dark frame library for darksubtract.py.
+One-off tool that builds the master dark frame library for darksubtract.py.
 
-Run manually, interactively, with the dome/lens physically covered (no
-light reaching the sensor - this camera has no shutter, so this can't be
-automated mid-sequence). Captures DARK_FRAMES_PER_EXPOSURE raw darks at
-each of a fixed spread of exposure durations, using the exact same
-libcamera-still parameters (additional_night_params, night_mode,
-night_sharpness, night_contrast) as a real night capture, and averages
-them into one master dark per exposure - see DARK_FRAMES_PER_EXPOSURE's
-own comment for why a single dark isn't enough. Saved as lossless PNG
-(subtracting from a JPEG dark would reintroduce compression noise). Needs
-re-running whenever any of those settings change in config.txt -
-darksubtract.py checks this and refuses a stale library rather than
-silently using it.
+Run it manually with the dome/lens physically covered. For each exposure in
+EXPOSURES_SECS it captures DARK_FRAMES_PER_EXPOSURE darks with the same libcamera-still
+parameters as a night capture (additional_night_params, night_mode, night_sharpness,
+night_contrast), averages them into one master dark and saves it as lossless PNG.
+Re-run it whenever one of those settings changes: darksubtract.py refuses a library
+captured under different settings.
 
-A full session (multiple exposures x multiple frames each, some up to a
-minute long) would otherwise race the regular scheduled capture for the
-camera, and can run long enough to trip the watchdog's reboot-if-stalled
-check - so this pauses both the regular capture job and the watchdog
-(see crontab.pauseCaptureJobs()) for the duration, and always restores
-them afterward (a crash, Ctrl-C, or the frame-count guard below aborting
-all still trigger the restore, via try/finally).
+While it runs, the regular capture job and the watchdog are paused
+(crontab.pauseCaptureJobs()) and restored afterward, also on a crash, Ctrl-C or abort
+(try/finally).
 
 Usage:
     python -m frankAllSkyCam.capturedarks
@@ -36,35 +26,16 @@ from configparser import ConfigParser
 from frankAllSkyCam import fileManager, darksubtract, crontab
 
 EXPOSURES_SECS = [5, 15, 30, 45, 60]
-DARK_FRAMES_PER_EXPOSURE = 5  # averaged into one master dark per exposure - a
-                               # single dark frame's own read/thermal noise gets
-                               # subtracted into every light frame right along
-                               # with the fixed pattern (hot pixels, dark
-                               # current) it's meant to correct, since noise
-                               # adds in quadrature rather than cancelling;
-                               # averaging N frames reduces that injected noise
-                               # by ~sqrt(N) while the fixed pattern - identical
-                               # across all N - averages to the same value a
-                               # single frame would already show. 5 is a modest
-                               # default, not a rigorously tuned one: this
-                               # pipeline's JPEG output is already lossy/
-                               # nonlinear (see darksubtract.py's own
-                               # docstring), so a large stack has diminishing
-                               # returns here - raise it if the covered-lens
-                               # session length isn't a concern for your install.
-MIN_USABLE_FRAMES_PER_EXPOSURE = 2  # below this (e.g. capture failures), refuse
-                                     # to average rather than silently build a
-                                     # master dark from too little data
+DARK_FRAMES_PER_EXPOSURE = 5  # averaged into one master dark: a single dark adds its own
+                               # read/thermal noise to every frame it is subtracted from,
+                               # averaging N reduces that by ~sqrt(N)
+MIN_USABLE_FRAMES_PER_EXPOSURE = 2  # fewer successful captures than this: refuse to average
 
 
 def _average_frames(frames):
     '''
-    Pixel-wise mean of same-shape frames (as returned by cv2.imread),
-    rounded and clipped back to uint8 - builds a master dark from several
-    individual dark captures at the same exposure. The fixed pattern (hot
-    pixels, dark current) is identical across all N and averages to the
-    same value a single frame would already show; each frame's own
-    independent read/thermal noise is what actually gets reduced (~sqrt(N)).
+    Pixel-wise mean of same-shape frames (cv2.imread arrays), rounded and clipped back
+    to uint8. Averaging reduces the random read/thermal noise; the fixed pattern stays.
     '''
     stacked = np.stack([f.astype(np.float32) for f in frames], axis=0)
     return np.clip(np.round(stacked.mean(axis=0)), 0, 255).astype(np.uint8)
@@ -96,12 +67,8 @@ def main():
     print("  night_sharpness = " + night_sharpness)
     print("  night_contrast = " + night_contrast)
 
-    # Pausing here, before the interactive prompt below rather than after
-    # it: the wait for the user to physically cover the dome and press
-    # Enter is itself unbounded, and a regular scheduled capture firing
-    # during that wait would already contend with this tool for the camera
-    # - see crontab.pauseCaptureJobs()'s own docstring for why the watchdog
-    # is paused along with the capture job itself, not just outlasted.
+    # Pause before the interactive prompt: the wait for the user to cover the dome is
+    # unbounded and a scheduled capture during it would contend for the camera
     print("Pausing regular captures and the watchdog while this runs...")
     original_crontab = crontab.pauseCaptureJobs()
     try:
