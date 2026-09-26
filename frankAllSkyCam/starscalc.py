@@ -11,10 +11,10 @@ work on the remaining sky, eroded by a guard band.
 Night (ROI mean gray <= DAYTIME_MEAN_THRESHOLD):
  - stars: band-pass filter, adaptive per-region threshold, shape filter and
    declustering;
- - cloud cover: the maximum of the radiance rate (mean gray / exposure), the
-   cloud-scale texture, the zenith-only broad-glow patchiness ("haze", skipped
-   with the Moon in frame) and a floor from too few stars on a dark, moonless
-   sky.
+ - cloud cover: the maximum of the radiance rate (mean gray / exposure, less
+   the expected moonlight), the cloud-scale texture, the zenith-only broad-glow
+   patchiness ("haze", skipped with the Moon in frame or well up) and a floor
+   from too few stars on a dark, moonless sky.
 
 Day: no stars are counted; cloud cover is the mean cloud-likeness of the
 Normalized Red-Blue Ratio, NRBR = (B-R)/(B+R) (clear sky is blue, cloud is
@@ -81,6 +81,12 @@ CLOUD_TEX_HIGH = 14.0            # ...and of structured cloud
 CLOUD_BRIGHTNESS_LOW = 33.0      # exposure-less fallback: mean gray of a clear sky
 CLOUD_BRIGHTNESS_HIGH = 50.0     # ...and of an overcast sky
 
+# Moonlight brightens a clear sky: its radiance rate is about
+# CLOUD_RATE_LOG_LOW + CLOUD_RATE_MOON_COEFF * moon_factor, so that much is subtracted
+# from the rate before scoring. The effect grows faster than the illuminated fraction,
+# so near full moon a clear sky can still read somewhat cloudy.
+CLOUD_RATE_MOON_COEFF = 7.7
+
 CLOUD_TEX_REFERENCE_MEAN = 30.0  # ROI mean gray the texture thresholds are calibrated at; the
                                   # texture-only path scales tex_std by this / actual mean
 
@@ -114,6 +120,8 @@ HAZE_SPREAD_REFERENCE_MEAN = 30.0  # ROI mean gray the two spreads are calibrate
                                   # measured spread is scaled by this / actual mean
 
 HAZE_INNER_ROI_RATIO = 0.35      # haze is measured over this zenith-only fraction of the ROI
+HAZE_MAX_MOON_FACTOR = 0.2       # haze is skipped at or above this moon_factor: the glow of a
+                                  # Moon outside the frame reads as patchiness
 
 
 def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_contrasto=25, exposure_secs=None, twilight_isp_mode=False, twilight_fixed_shutter_band=False, skip_star_detection=False, sun_alt_deg=None, moon_factor=None):
@@ -139,7 +147,9 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
       non dipende dal conteggio delle stelle.
     - sun_alt_deg, moon_factor: altezza del Sole (gradi) e moon_brightness_factor()
       (0-1); abilitano il pavimento notturno 'star-deficit' (STAR_DEFICIT_*). Se uno
-      dei due e' None il pavimento e' disattivato.
+      dei due e' None il pavimento e' disattivato. moon_factor sottrae anche la luce
+      lunare attesa dal radiance-rate (CLOUD_RATE_MOON_COEFF) e disattiva l'haze da
+      HAZE_MAX_MOON_FACTOR in su.
 
     OUTPUT:
     - star_count: numero di stelle (None se skip_star_detection nel ramo notturno;
@@ -176,10 +186,10 @@ def analyze_sky_robust(image_path, diametro_rapporto=0.75, sensibilita=0.5, min_
     elif twilight_isp_mode:
         cloud_cover = _estimate_cloud_cover_nrbr(img, sky_eroded)
     else:
-        cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs)
-        if not source_found:
-            # skipped with the Moon (or another dominant bright source) in frame: its glow
-            # dominates the broad-glow spread this signal measures
+        cloud_cover = _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs, moon_factor)
+        if not source_found and (moon_factor is None or moon_factor < HAZE_MAX_MOON_FACTOR):
+            # skipped with the Moon (or another dominant bright source) in frame or well up:
+            # its glow dominates the broad-glow spread this signal measures
             haze_cover = _estimate_cloud_cover_haze(gray, sky_eroded)
             cloud_cover = round(max(cloud_cover, 100.0 * haze_cover), 1)
         cloud_cover = round(max(cloud_cover, _star_deficit_floor(star_count, source_found, sun_alt_deg, moon_factor)), 1)
@@ -516,7 +526,7 @@ def _cloud_texture_grid(gray, sky_mask, grid_rows, grid_cols):
     return scores, cell_h, cell_w
 
 
-def _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs):
+def _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs, moon_factor=None):
     texture_mask = sky_eroded if np.any(sky_eroded == 255) else sky
 
     small = cv2.GaussianBlur(gray, (0, 0), sigmaX=CLOUD_TEX_SMALL_SIGMA)
@@ -534,6 +544,8 @@ def _estimate_cloud_cover(image_path, gray, sky, sky_eroded, exposure_secs):
         # exposure known: use the exposure-normalized signal, strictly more
         # informative than raw brightness for the same mean_gray value
         rate = mean_gray / exposure_secs
+        if moon_factor:
+            rate -= CLOUD_RATE_MOON_COEFF * moon_factor
         brightness_signal = _clip01(
             (math.log(max(rate, 1e-6)) - math.log(CLOUD_RATE_LOG_LOW)) /
             (math.log(CLOUD_RATE_LOG_HIGH) - math.log(CLOUD_RATE_LOG_LOW))

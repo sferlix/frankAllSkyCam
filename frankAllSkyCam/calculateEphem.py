@@ -66,10 +66,12 @@ def calculate(dt):
    sun = ephem.Sun(mySite)
    moon = ephem.Moon(mySite)
 
-   # the Moon is bound to mySite (lat/lon/elevation/date), so its phase and elongation
-   # refer to dt
+   # the Moon is bound to mySite (lat/lon/elevation/date), so its phase, elongation and
+   # altitude refer to dt; read them before next_setting/next_rising, which recompute
+   # the body at the rise/set time
    phase = moon.moon_phase
    a = moon.elong
+   moonAlt = float(moon.alt)*180/ephem.pi
    mp = 1 - phase
    if a > 0:
        mp = -mp
@@ -77,7 +79,6 @@ def calculate(dt):
 
    moon_setting = ephem.localtime(mySite.next_setting(moon))
    moon_next_new = ephem.localtime(ephem.next_new_moon(mySite.date))
-   moonAlt = float(moon.alt)*180/ephem.pi
    if moonAlt < 0.:
       moon_next_rising = ephem.localtime(mySite.next_rising(moon))
    else:
