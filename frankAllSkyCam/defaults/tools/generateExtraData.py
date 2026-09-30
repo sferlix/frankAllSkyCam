@@ -104,9 +104,10 @@ def getInternalTempHum():
 
 
 def getCPUTemp():
-    from gpiozero import CPUTemperature
-    cpu = CPUTemperature()
-    return "CPU: " + str(int(cpu.temperature)) + "°C\n"
+    # read from sysfs, not gpiozero: gpiozero runs GPIO.cleanup() at exit,
+    # which would reset the dew heater relay pin to input (heater off)
+    with open("/sys/class/thermal/thermal_zone0/temp") as f:
+        return "CPU: " + str(int(f.read()) // 1000) + "°C\n"
 
 
 import requests
@@ -349,13 +350,19 @@ def writeDataToTxtFile(myString, myFile):
     os.replace(tmpFile, myFile)
 
 
-def getDHStatus2(pin):
-    import RPi.GPIO as GPIO
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(pin, GPIO.IN)
-    state = GPIO.input(pin)
-    return 'DH: on\n' if state else 'DH: off\n'
+def getDHStatus2(pin, active_low=False):
+    # reads the relay pin without reconfiguring it, so the output level set by
+    # switchGpioRelay is kept; a pin that is not an output means heater off
+    import subprocess
+    try:
+        out = subprocess.run(["raspi-gpio", "get", str(pin)], capture_output=True, text=True, timeout=5).stdout
+    except Exception as e:
+        print("getDHStatus2 error: " + str(e))
+        return 'DH: --\n'
+    if "func=OUTPUT" not in out:
+        return 'DH: off\n'
+    on_level = "level=0" if active_low else "level=1"
+    return 'DH: on\n' if on_level in out else 'DH: off\n'
 
 
 def _dewHeaterApiCall(api_url):
@@ -451,7 +458,6 @@ def getData():
     Ta = getShelly1V3Data("192.168.178.8")
     # isOn = getShelly1V3SwitchStatus("192.168.1.54")
     intT, intH = getInternalTempHum()
-    dhStatus = getDHStatus2(17)
 
     myString = ""
     myString += MeteoS
@@ -464,6 +470,10 @@ def getData():
     dewPoint = None
     intTemp = float(Ta) if Ta else None
     checkAndSwitchDewHeater(intTemp, dewPoint)
+    # read after switching, so the overlay shows the current relay state
+    if DEW_HEATER_ENABLED and DEW_HEATER_METHOD == "gpio":
+        dhStatus = getDHStatus2(DEW_HEATER_GPIO_PIN, DEW_HEATER_GPIO_ACTIVE_LOW)
+        myString += dhStatus
 
     # last line on purpose - delete it if you don't want the running
     # version watermarked on the image, without touching anything above
