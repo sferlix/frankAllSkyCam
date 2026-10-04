@@ -8,7 +8,7 @@ Open-source AllSky camera software for a **Raspberry Pi + Pi HQ Camera** (or com
 
 - Captures a full-sky JPEG every minute or so, with exposure automatically driven by measured or estimated sky brightness (SQM), day or night.
 - Watermarks each image with date/time, sun and moon rise/set times, moon phase, visible-planet icons, your own logo/compass, and any extra sensor data you want to show (weather station, temperature, humidity, ...).
-- Estimates **cloud cover** and **star count** directly from the image, using different, purpose-built detection for daytime (blue-sky-vs-cloud color analysis) and nighttime (adaptive point-source detection that accounts for the Moon, trees/obstructions, and partial cloud).
+- Estimates **cloud cover** and **star count** directly from the image, using different, purpose-built detection for daytime (blue-sky-vs-cloud color analysis) and nighttime (adaptive point-source detection that accounts for the Moon, trees/obstructions, and partial cloud). At night it **calibrates itself to your camera and sky** over the first weeks, with no action needed from you, to tell moonlit cloud from moonlit clear sky.
 - Builds nightly **timelapses** (night-only and/or full 24h) and a **startrail** image, and can upload everything to your own website via FTP.
 - Optionally drives a **dew heater** (via a network relay or a GPIO-controlled one) based on the gap between internal temperature and dew point, to keep the lens clear.
 - A watchdog reboots the Pi automatically if captures ever stall.
@@ -265,6 +265,19 @@ python -m frankAllSkyCam.calibratehotpixels <folder-of-your-own-night-jpgs> --ou
 then move `hotpixels.json` into `~/frankAllSkyCam/`. It finds pixel positions that recur at the exact same coordinate across several of your own archived night frames (`~/frankAllSkyCam/img/<date>/`, at least 5) - real stars drift slightly night to night, fixed sensor defects don't. Add `--layout <name>` if you have a preset exclusion mask for your own watermark layout (keeps text/logo edges from being miscounted as recurring defects); omit it and it just won't exclude any region. Coordinates are specific to one physical sensor - never copy `hotpixels.json` between installs.
 
 Both are entirely optional - frankAllSkyCam works fine without either.
+
+## 8. Night cloud detection calibrates itself (nothing to do)
+
+Moonlight makes a clear sky brighter and bluer, and every camera, white balance and site renders a clear night sky slightly differently. To tell a moonlit clear sky from moonlit cloud reliably, frankAllSkyCam learns what a clear night sky looks like **on your own install**, automatically:
+
+- **Collecting:** every night capture (Sun more than 18 degrees below the horizon) adds one small row of measurements - sky brightness per second of exposure, sky color, star count, texture and the Moon's brightness - to `~/frankAllSkyCam/log/night_calibration_samples.csv`. No images are copied and no cron job is added.
+- **Calibrating:** once the samples cover a few clear moonless nights and a few clear nights under a bright Moon (typically 1-3 weeks; longer after a cloudy spell, since it needs both), it derives the clear-sky brightness, the effect of the Moon and the clear-sky color for your camera, without anyone labelling frames. The result is saved to `~/frankAllSkyCam/night_calibration.json`, together with the outcome of the last attempt (e.g. `not calibrated: not enough clear moonlit frames yet`).
+- **Using it:** with a calibration, night cloud cover compares each frame with the clear sky expected for the current Moon - its brightness and its color (moonlit clear sky is blue, moonlit cloud grey, light-polluted cloud yellow) - and expects fewer stars under a brighter Moon. Until the first calibration exists, the previous night detection is used unchanged.
+- **Staying current:** it recalibrates every 30 days from the last 60 days of samples (older samples are deleted, so the file stays at a few MB). Changing the camera settings it depends on (`additional_night_params` such as gain and white balance, `night_contrast`, `night_sharpness`, or the resolution) automatically discards the old calibration and starts collecting again.
+
+A calibration that fails its plausibility checks is never applied. To start over, delete `night_calibration.json` and `log/night_calibration_samples.csv`.
+
+**Star count on dark nights:** under a dark, moonless sky (once calibrated) dense star fields such as the Milky Way are counted in full instead of being discarded as clutter, so the reported star count is noticeably higher than before on clear moonless nights.
 
 ---
 

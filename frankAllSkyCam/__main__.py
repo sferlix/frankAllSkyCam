@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -335,6 +335,9 @@ def _run():
        # (twilight_isp_mode). twilight_fixed_shutter_band frames have a real but very short
        # exposure and use the texture-only signal instead.
        cloud_is_isp_driven = twilight_isp_mode or (cloud_exposure_secs is None and sun_alt < 0)
+       # night moon model: self-calibrated per install (nightcalib.py); off until calibrated
+       calib_fp = nightcalib.fingerprint(additional_night_params, night_contrast, night_sharpness, horiz, vert, 0.65)
+       sky_features = {}
        print("calculating stars on: " + jpg_file_name)
        sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs,
                                                  twilight_isp_mode=cloud_is_isp_driven,
@@ -342,7 +345,13 @@ def _run():
                                                  # lets the night star-deficit floor know the sky is dark and moonless
                                                  sun_alt_deg=sun_alt,
                                                  moon_factor=starscalc.moon_brightness_factor(
-                                                    data.get("moonAlt"), data.get("moonIllumination")))
+                                                    data.get("moonAlt"), data.get("moonIllumination")),
+                                                 moon_brightness=starscalc.moon_sky_brightness(
+                                                    data.get("moonAlt"), data.get("moonIllumination")),
+                                                 night_calibration=nightcalib.load(appPath, calib_fp),
+                                                 features=sky_features)
+       if nightcalib.record(appPath, sky_features, calib_fp):
+          nightcalib.maybe_calibrate(appPath, calib_fp)
        data["stars"] = sst
        data["clouds"] = scl
 

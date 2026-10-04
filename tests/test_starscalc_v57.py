@@ -131,7 +131,7 @@ def test_star_floor_is_off_unless_the_sky_is_known_dark():
 
 
 def test_star_floor_raises_the_reported_cloud_cover(tmp_path, monkeypatch):
-    monkeypatch.setattr(sc, "_find_stars", lambda *a, **k: 2)
+    monkeypatch.setattr(sc, "_star_counts", lambda *a, **k: (2, 2))
     monkeypatch.setattr(sc, "_estimate_cloud_cover", lambda *a, **k: 10.0)
     monkeypatch.setattr(sc, "_estimate_cloud_cover_haze", lambda *a, **k: 0.0)
     monkeypatch.setattr(sc.staticmask, "get_static_mask", lambda shape, p: None)
@@ -149,7 +149,7 @@ def test_star_floor_raises_the_reported_cloud_cover(tmp_path, monkeypatch):
 
 
 def test_star_floor_never_lowers_an_already_high_reading(tmp_path, monkeypatch):
-    monkeypatch.setattr(sc, "_find_stars", lambda *a, **k: 12)   # floor would be ~53
+    monkeypatch.setattr(sc, "_star_counts", lambda *a, **k: (12, 12))   # floor would be ~53
     monkeypatch.setattr(sc, "_estimate_cloud_cover", lambda *a, **k: 80.0)
     monkeypatch.setattr(sc, "_estimate_cloud_cover_haze", lambda *a, **k: 0.0)
     monkeypatch.setattr(sc.staticmask, "get_static_mask", lambda shape, p: None)
