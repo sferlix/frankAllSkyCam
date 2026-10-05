@@ -156,3 +156,33 @@ def test_moon_brightness_reaches_the_file(tmp_path):
     assert ds.applyToFile(b, str(tmp_path), 0.20, True, -40.0, now=1000.0, moon_brightness=0.05)
     pa, pb = cv2.imread(a)[100, 100].astype(int), cv2.imread(b)[100, 100].astype(int)
     assert pb[0] - pb[2] > pa[0] - pa[2] + 10
+
+
+def _grainy_sky_with_faint_stars():
+    rng = np.random.default_rng(1)
+    image = np.clip(rng.normal(32, 2.0, (240, 320, 3)), 0, 255)
+    stars = [(40 + 30 * i, 40 + 37 * j) for i in range(6) for j in range(7)]
+    for y, x in stars:
+        image[y, x] += 9  # a faint star: about 4.5 noise levels above the sky
+    return image.astype(np.uint8), stars
+
+
+def _contrast(out, stars):
+    g = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    local = cv2.medianBlur(g.astype(np.uint8), 9).astype(np.float32)
+    return float(np.median([g[y, x] - local[y, x] for y, x in stars]))
+
+
+def _grain(out):
+    g = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    return float(np.std(g - cv2.GaussianBlur(g, (0, 0), 2.0)))
+
+
+def test_denoise_smooths_the_sky_but_keeps_faint_stars(monkeypatch):
+    image, stars = _grainy_sky_with_faint_stars()
+    monkeypatch.setattr(ds, "LUMA_DENOISE_H", 0)
+    plain = ds.stretch(image, 0.20, np.ones(3))
+    monkeypatch.setattr(ds, "LUMA_DENOISE_H", 4)
+    smooth = ds.stretch(image, 0.20, np.ones(3))
+    assert _grain(smooth) < 0.75 * _grain(plain)
+    assert _contrast(smooth, stars) > 0.7 * _contrast(plain, stars)

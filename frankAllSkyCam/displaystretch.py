@@ -11,7 +11,8 @@ after the cloud/star analysis and the exposure feedback, so no measurement sees 
    a background at REFERENCE_BACKGROUND lands on the configured brightness and hues hold;
  - colour noise smoothed and saturation lowered slightly, and colour faded on features much
    brighter than the sky (stars), whose colour at this scale is mostly debayer artefact;
- - the brightness grain the stretch lifts with the sky smoothed by non-local means.
+ - the brightness grain the stretch lifts with the sky smoothed by non-local means, except
+   on pixels clearly brighter than their surroundings, so faint stars keep their contrast.
 
 The curve is the same for every frame and the balance follows a running average of the
 sky colour, so a timelapse does not flicker and real brightness changes (moonrise,
@@ -68,6 +69,7 @@ SATURATION = 0.85
 HIGHLIGHT_FADE_ABOVE = 40.0      # luma above the sky background where colour is faded to ...
 HIGHLIGHT_COLOUR_KEEP = 0.25     # ... this share
 LUMA_DENOISE_H = 4               # non-local means strength on brightness after the stretch; 0 disables
+STAR_KEEP_SIGMA = (1.5, 4.0)     # noise levels above the local sky where denoising fades out (full at the second)
 
 FADE_FULL_SUN_ALT = -12.0
 FADE_ZERO_SUN_ALT = -6.0
@@ -154,10 +156,22 @@ def _calm_colour(image, sky):
         ycc[..., c] = 128.0 + keep * chroma
     ycc = np.clip(ycc + 0.5, 0, 255).astype(np.uint8)
     if LUMA_DENOISE_H > 0:
-        # the stretch lifts the sensor grain with the sky; smooth it on brightness only
-        ycc[..., 0] = cv2.fastNlMeansDenoising(np.ascontiguousarray(ycc[..., 0]), None, h=LUMA_DENOISE_H,
-                                               templateWindowSize=5, searchWindowSize=15)
+        ycc[..., 0] = _denoise_keeping_stars(ycc[..., 0])
     return cv2.cvtColor(ycc, cv2.COLOR_YCrCb2BGR)
+
+
+def _denoise_keeping_stars(luma):
+    # the stretch lifts the sensor grain with the sky: smooth it on brightness only, but keep
+    # the original pixels where they stand STAR_KEEP_SIGMA above their surroundings, since
+    # non-local means flattens faint stars as if they were grain
+    smooth = cv2.fastNlMeansDenoising(np.ascontiguousarray(luma), None, h=LUMA_DENOISE_H,
+                                      templateWindowSize=5, searchWindowSize=15).astype(np.float32)
+    y = luma.astype(np.float32)
+    excess = y - cv2.medianBlur(luma, 7).astype(np.float32)
+    noise = max(1.4826 * float(np.median(np.abs(excess))), 0.5)
+    lo, hi = STAR_KEEP_SIGMA
+    keep = cv2.dilate(np.clip((excess / noise - lo) / (hi - lo), 0.0, 1.0), np.ones((3, 3), np.uint8))
+    return np.clip(smooth + keep * (y - smooth) + 0.5, 0, 255).astype(np.uint8)
 
 
 def stretch(image, target, gains, fade=1.0):
