@@ -156,19 +156,28 @@ def _calm_colour(image, sky):
         ycc[..., c] = 128.0 + keep * chroma
     ycc = np.clip(ycc + 0.5, 0, 255).astype(np.uint8)
     if LUMA_DENOISE_H > 0:
-        ycc[..., 0] = _denoise_keeping_stars(ycc[..., 0])
+        ycc[..., 0] = _denoise_keeping_stars(ycc[..., 0], sky)
     return cv2.cvtColor(ycc, cv2.COLOR_YCrCb2BGR)
 
 
-def _denoise_keeping_stars(luma):
+def _sky_noise(excess, sky):
+    # noise of the sky pixels' excess over their local median: rms after clipping stars, so it
+    # moves smoothly with the noise instead of in whole grey levels like a median of integers
+    e = excess[sky]
+    core = np.abs(e) <= max(3.0 * 1.4826 * float(np.median(np.abs(e))), 2.0)
+    return max(float(np.sqrt(np.mean(e[core] ** 2))) if core.any() else 0.0, 0.5)
+
+
+def _denoise_keeping_stars(luma, sky):
     # the stretch lifts the sensor grain with the sky: smooth it on brightness only, but keep
     # the original pixels where they stand STAR_KEEP_SIGMA above their surroundings, since
-    # non-local means flattens faint stars as if they were grain
+    # non-local means flattens faint stars as if they were grain. The noise is measured on the
+    # sky alone: black borders and trees would make it look lower and protect the grain.
     smooth = cv2.fastNlMeansDenoising(np.ascontiguousarray(luma), None, h=LUMA_DENOISE_H,
                                       templateWindowSize=5, searchWindowSize=15).astype(np.float32)
     y = luma.astype(np.float32)
     excess = y - cv2.medianBlur(luma, 7).astype(np.float32)
-    noise = max(1.4826 * float(np.median(np.abs(excess))), 0.5)
+    noise = _sky_noise(excess, sky)
     lo, hi = STAR_KEEP_SIGMA
     keep = cv2.dilate(np.clip((excess / noise - lo) / (hi - lo), 0.0, 1.0), np.ones((3, 3), np.uint8))
     return np.clip(smooth + keep * (y - smooth) + 0.5, 0, 255).astype(np.uint8)

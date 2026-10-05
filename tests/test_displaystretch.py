@@ -186,3 +186,17 @@ def test_denoise_smooths_the_sky_but_keeps_faint_stars(monkeypatch):
     smooth = ds.stretch(image, 0.20, np.ones(3))
     assert _grain(smooth) < 0.75 * _grain(plain)
     assert _contrast(smooth, stars) > 0.7 * _contrast(plain, stars)
+
+
+def test_denoise_is_not_weakened_by_dark_foreground(monkeypatch):
+    # trees and the frame border are darker and less noisy than the sky; they must not lower
+    # the noise level the star protection is judged against
+    image, stars = _grainy_sky_with_faint_stars()
+    dark = image.copy()
+    dark[:, :150] = 2  # below the black point: pure black after the stretch
+    monkeypatch.setattr(ds, "LUMA_DENOISE_H", 0)
+    plain = ds.stretch(dark, 0.20, np.ones(3))
+    monkeypatch.setattr(ds, "LUMA_DENOISE_H", 4)
+    smooth = ds.stretch(dark, 0.20, np.ones(3))
+    sky = (slice(None), slice(170, None))
+    assert _grain(smooth[sky]) < 0.75 * _grain(plain[sky])
