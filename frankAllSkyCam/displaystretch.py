@@ -10,7 +10,8 @@ after the cloud/star analysis and the exposure feedback, so no measurement sees 
  - one fixed midtone curve on brightness only, the same factor for all three channels, so
    a background at REFERENCE_BACKGROUND lands on the configured brightness and hues hold;
  - colour noise smoothed and saturation lowered slightly, and colour faded on features much
-   brighter than the sky (stars), whose colour at this scale is mostly debayer artefact.
+   brighter than the sky (stars), whose colour at this scale is mostly debayer artefact;
+ - the brightness grain the stretch lifts with the sky smoothed by non-local means.
 
 The curve is the same for every frame and the balance follows a running average of the
 sky colour, so a timelapse does not flicker and real brightness changes (moonrise,
@@ -66,6 +67,7 @@ CHROMA_SIGMA_PX = 1.5            # colour (not brightness) smoothing
 SATURATION = 0.85
 HIGHLIGHT_FADE_ABOVE = 40.0      # luma above the sky background where colour is faded to ...
 HIGHLIGHT_COLOUR_KEEP = 0.25     # ... this share
+LUMA_DENOISE_H = 4               # non-local means strength on brightness after the stretch; 0 disables
 
 FADE_FULL_SUN_ALT = -12.0
 FADE_ZERO_SUN_ALT = -6.0
@@ -150,7 +152,12 @@ def _calm_colour(image, sky):
     for c in (1, 2):
         chroma = cv2.GaussianBlur(ycc[..., c] - 128.0, (0, 0), CHROMA_SIGMA_PX)
         ycc[..., c] = 128.0 + keep * chroma
-    return cv2.cvtColor(np.clip(ycc + 0.5, 0, 255).astype(np.uint8), cv2.COLOR_YCrCb2BGR)
+    ycc = np.clip(ycc + 0.5, 0, 255).astype(np.uint8)
+    if LUMA_DENOISE_H > 0:
+        # the stretch lifts the sensor grain with the sky; smooth it on brightness only
+        ycc[..., 0] = cv2.fastNlMeansDenoising(np.ascontiguousarray(ycc[..., 0]), None, h=LUMA_DENOISE_H,
+                                               templateWindowSize=5, searchWindowSize=15)
+    return cv2.cvtColor(ycc, cv2.COLOR_YCrCb2BGR)
 
 
 def stretch(image, target, gains, fade=1.0):

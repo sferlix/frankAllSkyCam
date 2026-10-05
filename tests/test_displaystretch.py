@@ -28,7 +28,8 @@ def test_reference_background_lands_on_target():
     assert abs(int(out[0, 0, 0]) - round(0.20 * 255)) <= 1
 
 
-def test_curve_keeps_black_white_and_order():
+def test_curve_keeps_black_white_and_order(monkeypatch):
+    monkeypatch.setattr(ds, "LUMA_DENOISE_H", 0)  # a spatial filter blends the neighbouring levels
     levels = np.arange(256, dtype=np.uint8).reshape(1, 256, 1).repeat(3, axis=2)
     out = ds.stretch(levels, 0.20, np.ones(3))[0, :, 0].astype(int)
     assert out[0] == 0 and out[255] == 255
