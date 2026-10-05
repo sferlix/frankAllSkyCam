@@ -281,12 +281,12 @@ A calibration that fails its plausibility checks is never applied. To start over
 
 ## 9. Brighter, neutral night images
 
-Straight out of the camera, a night frame is dark (the sky background sits around 12% of full brightness) and greenish (the fixed night white balance). After all measurements are taken - exposure feedback, star count, cloud cover and the night calibration all use the frame as captured - frankAllSkyCam lifts the midtones of the saved image with a fixed curve and grey-balances the sky. Night images are brighter and more neutral, and clouds lit by light pollution are easier to see. This applies in both exposure modes. It's set in `config.txt`:
+Straight out of the camera, a night frame is dark (the sky background sits around 12% of full brightness) and greenish (the fixed night white balance). After all measurements are taken - exposure feedback, star count, cloud cover and the night calibration all use the frame as captured - frankAllSkyCam brightens the saved image with a fixed curve and balances the sky colour: a slightly cool grey on a dark night, and a natural blue under moonlight, with the Moon itself staying white. The colour correction works in linear light (the camera's tone curve is undone first), so the Milky Way, stars and clouds keep a neutral colour instead of turning pink, and colour noise is smoothed. Night images are brighter and more natural, and clouds lit by light pollution are easier to see. This applies in both exposure modes. It's set in `config.txt`:
 
 ```
 [night_display]
 night_stretch = 0.20        # brightness a typical night sky background is lifted to; 0 keeps frames as captured
-night_neutral_sky = True    # grey-balance the night sky colour
+night_neutral_sky = True    # balance the night sky colour (cool grey, or blue under the Moon)
 ```
 
 If the section is missing, these defaults apply. The same curve is used for every frame, so timelapses don't flicker. During twilight the effect fades out, and it leaves a frame untouched when its sky colour can't be balanced (deep blue twilight, where the red channel is already gone in the captured image).

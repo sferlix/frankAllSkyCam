@@ -379,7 +379,9 @@ def _run():
           # day captures are not tracked (the ISP exposes)
           autoexposure.recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=ae_roi_percent)
           # display stretch of the saved frame (any exposure mode), after every measurement
-          displaystretch.applyToFile(jpg_file_name, appPath, night_stretch, night_neutral_sky, sun_alt)
+          displaystretch.applyToFile(jpg_file_name, appPath, night_stretch, night_neutral_sky, sun_alt,
+                                     moon_brightness=starscalc.moon_sky_brightness(
+                                        data.get("moonAlt"), data.get("moonIllumination")))
 
 
        photo = drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)
