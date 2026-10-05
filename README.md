@@ -285,7 +285,7 @@ Straight out of the camera, a night frame is dark (the sky background sits aroun
 
 ```
 [night_display]
-night_stretch = 0.20        # brightness a typical night sky background is lifted to; 0 keeps frames as captured
+night_stretch = 0.15        # brightness a typical night sky background is lifted to; 0 keeps frames as captured
 night_neutral_sky = True    # balance the night sky colour (cool grey, or blue under the Moon)
 ```
 

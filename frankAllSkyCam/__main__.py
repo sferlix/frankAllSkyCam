@@ -113,7 +113,7 @@ ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_sever
 use_sqm_le = config['sqm']['use_sqm_le']
 
 # display stretch of night and twilight-band frames (displaystretch.py); 0 disables
-night_stretch = config.getfloat('night_display', 'night_stretch', fallback=0.20)
+night_stretch = config.getfloat('night_display', 'night_stretch', fallback=0.15)
 night_neutral_sky = config.getboolean('night_display', 'night_neutral_sky', fallback=True)
 
 isFTP = str(config['ftp']['isFTP'])=='True'

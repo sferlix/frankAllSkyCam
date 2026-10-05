@@ -65,7 +65,7 @@ night_sharpness = 0
 [night_display]
 # brightness (0-1) a typical night sky background is lifted to on the saved image;
 # applied after all measurements, in both exposure modes. 0 keeps frames as captured.
-night_stretch = 0.20
+night_stretch = 0.15
 # grey-balance the night sky colour on the saved image
 night_neutral_sky = True
 
