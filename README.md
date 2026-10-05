@@ -225,7 +225,20 @@ If it worked, you'll find the generated JPEG:
 python3 -m frankAllSkyCam.crontab
 ```
 
-This installs every scheduled job for you: captures (every minute, day and night), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
+This installs every scheduled job for you: captures (every minute by day, every 2 minutes at night), a watchdog every 15 minutes, nightly startrail and timelapse generation, daily old-image cleanup, and a periodic ephemeris refresh. Re-run it any time (e.g. once a year) to refresh the sunrise/sunset-based capture windows.
+
+**One frame per minute at night** (smoother night timelapses): only the camera time has to fit in the minute, since the analysis, watermark and upload of one frame overlap with the next capture. Set these in `config.txt`, then re-run `python3 -m frankAllSkyCam.crontab`:
+
+```
+[exposure]
+esp_secs = 50                 # longest night exposure, leaving room in the minute
+night_interval_minutes = 1
+
+[sqm]
+sqm_interval_minutes = 5      # measure the night sky brightness every 5 minutes, reuse it in between
+```
+
+The sky brightness changes slowly at night, so reusing it for a few minutes doesn't affect the exposure, and each measurement it saves frees about 11 seconds of camera time.
 
 A capture that runs long (a slow exposure, or a slow FTP upload) is safe to overlap with the next scheduled one: an internal lock only ever covers the camera-touching part of a run (SQM measurement through the shot itself) - never analysis, watermarking, saving, or upload, none of which touch the camera. If the camera is still genuinely busy when the next run starts, it waits (up to 90s) rather than skipping or colliding with the capture in progress; past that, it assumes the other run is stuck and clears it before proceeding.
 

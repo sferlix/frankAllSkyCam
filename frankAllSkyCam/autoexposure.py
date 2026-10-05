@@ -62,8 +62,11 @@ def _measure_roi(gray, roi_percent, clip_pixel_threshold=SATURATION_CLIP_PIXEL_T
 
 def _write_state(appPath, exposure_secs, mean_val, clip_frac, state_filename=STATE_FILENAME):
     state = {"exposure_secs": float(exposure_secs), "mean": mean_val, "clip_frac": clip_frac}
-    with open(_state_path(appPath, state_filename), "w") as f:
+    # temp file + rename: a run starting while this one finishes never reads half a file
+    path = _state_path(appPath, state_filename)
+    with open(path + ".tmp", "w") as f:
         json.dump(state, f)
+    os.replace(path + ".tmp", path)
 
 
 def recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=70, state_filename=STATE_FILENAME):

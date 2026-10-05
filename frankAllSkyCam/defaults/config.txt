@@ -189,6 +189,12 @@ venus_y_pos = 52
 #  this value only limits the max exposure. The calculated or real SQM will drive exposure
 esp_secs =60
 
+# minutes between night captures (by day it is always 1). 1 gives smoother night
+# timelapses but needs esp_secs at most 50 and sqm_interval_minutes (under [sqm]) above 1,
+# so the camera is free again within the minute. Takes effect when the crontab is
+# regenerated: python3 -m frankAllSkyCam.crontab
+night_interval_minutes = 2
+
 # how night exposure is decided:
 #  auto_exposure - measure the previous frame's own brightness and adjust
 #                  toward target_mean below. No sqmexp.csv calibration needed,
@@ -330,6 +336,10 @@ FTP_fileNameSkyStatusJSON = /status/sky_status.json
 sqmFolder = sqm
 # would you use the SQM-LE ? y/n
 use_sqm_le = n
+# at night, minutes between SQM measurements; the last reading is reused in between.
+# 1 measures every run. Use 5 with night_interval_minutes = 1 (each measurement takes
+# about 11 s of camera time).
+sqm_interval_minutes = 1
 # would you log your SQM ? y/n
 sqmLog = n
 # keep sqmDebug = n

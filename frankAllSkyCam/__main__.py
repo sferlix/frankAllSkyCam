@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib, displaystretch
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib, displaystretch, sqmcache
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -111,6 +111,8 @@ ae_twilight_ev_bias = config.getfloat('auto_exposure', 'twilight_ev_bias', fallb
 ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
 ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
 use_sqm_le = config['sqm']['use_sqm_le']
+# at night, minutes between SQM measurements; the last reading is reused in between (sqmcache.py)
+sqm_interval_minutes = config.getint('sqm', 'sqm_interval_minutes', fallback=1)
 
 # display stretch of night and twilight-band frames (displaystretch.py); 0 disables
 night_stretch = config.getfloat('night_display', 'night_stretch', fallback=0.15)
@@ -203,14 +205,25 @@ def _run():
     # darksubtract and capturedarks need it
     fileManager.createPath(appPath + "darks")
 
+    # ephemerides don't use the camera, so they are computed before taking the lock
+    data = calculateEphem.calculate(x)
+
     cameraLock = _acquireCameraLock()
     if cameraLock is None:
        print("Skipping this cycle - camera unavailable.")
        return
 
-    data = calculateEphem.calculate(x)
-    # full daytime: no SQM is computed; calculateExposure() returns 0 by day
-    sqm, sqm_le = readsqm(daytime=not data["isTimelapse"])
+    # full daytime: no SQM is computed; calculateExposure() returns 0 by day. At night the
+    # last reading is reused for sqm_interval_minutes.
+    night = data["sunAlt"] <= -ae_twilight_isp_backstop_deg
+    reused_sqm = sqmcache.load(appPath, sqm_interval_minutes) if night else None
+    if reused_sqm is not None:
+       sqm, sqm_le = reused_sqm
+       print("sqm = " + str(sqm) + " (reused)")
+    else:
+       sqm, sqm_le = readsqm(daytime=not data["isTimelapse"])
+       if night and sqm > 0:
+          sqmcache.save(appPath, sqm, sqm_le)
 
     # twilight handoff (same test at dusk and dawn): while the sun is below the horizon and
     # the feedback loop's prediction is still under min_exposure_secs, the ISP auto-exposes.

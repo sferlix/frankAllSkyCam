@@ -28,9 +28,33 @@ timeZone = str(config['site']['time_zone'])
 appPath = os.path.expanduser("~") + "/frankAllSkyCam/"
 logFolder = appPath + str(config['system']['logFolder'])
 
+# minutes between night captures. A night cycle holds the camera for the exposure (up to
+# esp_secs) plus about 1 s, and about 11 s more when the pseudo-SQM is measured, so 1 needs
+# esp_secs <= 50 and [sqm] sqm_interval_minutes above 1.
+night_interval_minutes = min(max(config.getint('exposure', 'night_interval_minutes', fallback=2), 1), 59)
+_esp_secs = config.getfloat('exposure', 'esp_secs', fallback=60.0)
+if _esp_secs + 10 > night_interval_minutes * 60:
+    print("WARNING: esp_secs = %g leaves no room in a %d-minute night interval; captures will "
+          "queue behind the camera lock" % (_esp_secs, night_interval_minutes))
+
 # tags every cron line this script writes, so readCrontab() replaces exactly its own lines
 # on a rerun and leaves unrelated user entries alone
 MARKER = "#frankAllSkyCam-managed"
+
+def _captureLines(mat, ser, night_interval, log_folder):
+    # capture schedule: every minute from hour mat to hour ser-1 (day), every night_interval
+    # minutes from ser to mat-1 (night). The edges are guarded so an extreme-latitude dawn/dusk
+    # can't produce an invalid range like "0--1" (crontab rejects the whole file).
+    job = " python3 -m frankAllSkyCam >" + log_folder + "/capture.log 2>&1 " + MARKER + "\n"
+    night = "*/" + str(night_interval)
+    lines = []
+    if mat <= ser - 1:
+        lines.append("*/1 " + str(mat) + "-" + str(ser - 1) + " * * *" + job)
+    lines.append(night + " " + str(ser) + "-23 * * *" + job)
+    if mat >= 1:
+        lines.append(night + " 0-" + str(mat - 1) + " * * * " + job)
+    return lines
+
 
 def getTimes():
 
@@ -81,16 +105,8 @@ def getTimes():
               for element in linesToAdd:
                   f.write(element)
 
-              # mat/ser split the day into 3 hour ranges: guard the edges so an extreme-latitude
-              # dawn/dusk can't produce an invalid range like "0--1" (crontab rejects the whole file)
-              if mat <= ser - 1:
-                 f.write("*/1 " + str(mat) +"-" + str(ser-1)+ " * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
-              # night hours run every 2 min: a night cycle (exposure up to esp_secs plus overhead)
-              # often takes over 60s, so a 1-min interval would only queue runs behind the camera
-              # lock. Daytime has near-instant exposure and keeps */1.
-              f.write("*/2 " + str(ser) +"-23 * * * python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
-              if mat >= 1:
-                 f.write("*/2 0-" + str(mat-1)+" * * *  python3 -m frankAllSkyCam >" + logFolder + "/capture.log 2>&1 " + MARKER + "\n")
+              for line in _captureLines(mat, ser, night_interval_minutes, logFolder):
+                 f.write(line)
               f.write("*/15 * * * * python3 -m frankAllSkyCam.watchDog >" + logFolder + "/watchdog.log 2>&1 " + MARKER + "\n")
               # generateExtraData.py lives in ~/frankAllSkyCam/tools/ (user-editable, not replaced by
               # upgrades), so it is invoked by absolute path rather than -m. It also switches the
