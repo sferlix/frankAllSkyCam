@@ -131,7 +131,43 @@ def test_changed_settings_ignore_old_samples(tmp_path):
 
 
 def test_fingerprint_changes_with_camera_settings():
-    a = nc.fingerprint("--gain 14 --awbgains 2.7,1.5", "2.5", "0", 1024, 768, 0.65)
-    assert a == nc.fingerprint("--gain 14 --awbgains 2.7,1.5 ", "2.5", "0", "1024", "768", 0.65)
-    assert a != nc.fingerprint("--gain 10 --awbgains 2.7,1.5", "2.5", "0", 1024, 768, 0.65)
-    assert a != nc.fingerprint("--gain 14 --awbgains 2.7,1.5", "2.5", "0", 800, 600, 0.65)
+    a = nc.fingerprint("--gain 14 --awbgains 2.7,1.5", "0", 1024, 768, 0.65)
+    assert a == nc.fingerprint("--gain 14 --awbgains 2.7,1.5 ", "0", "1024", "768", 0.65)
+    assert a != nc.fingerprint("--gain 10 --awbgains 2.7,1.5", "0", 1024, 768, 0.65)
+    assert a != nc.fingerprint("--gain 14 --awbgains 2.7,1.5", "0", 800, 600, 0.65)
+
+
+def test_legacy_fingerprint_matches_the_v61_formula():
+    # v61 hashed night_contrast between additional_night_params and night_sharpness
+    import hashlib
+    key = "|".join(["--gain 14 --awbgains 2.7,1.5", "2.5", "0", "1024", "768", "0.65"])
+    expected = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+    assert nc.legacy_fingerprint("--gain 14 --awbgains 2.7,1.5", "2.5", "0", 1024, 768, 0.65) == expected
+
+
+def test_calibration_moves_to_the_new_fingerprint(tmp_path):
+    app = str(tmp_path)
+    start = datetime.datetime(2026, 9, 1, 22, tzinfo=datetime.timezone.utc)
+    old = nc.legacy_fingerprint("--gain 14", "2.5", "0", 1024, 768, 0.65)
+    new = nc.fingerprint("--gain 14", "0", 1024, 768, 0.65)
+    _write_samples(app, _month(random.Random(5)), old, start)
+    now = start + datetime.timedelta(days=31)
+    params = nc.maybe_calibrate(app, old, now=now)
+    assert params is not None
+    created = json.loads((tmp_path / nc.CALIBRATION_FILE).read_text())["created"]
+
+    assert nc.load(app, new) is None
+    assert nc.adopt_legacy_fingerprint(app, new, old)
+    assert nc.load(app, new) == params
+    assert json.loads((tmp_path / nc.CALIBRATION_FILE).read_text())["created"] == created
+    since = start - datetime.timedelta(days=1)
+    assert len(nc.read_samples(app, new, since)) == 30 * 40
+    assert nc.read_samples(app, old, since) == []
+    # nothing left to move, and a calibration under other settings is never adopted
+    assert not nc.adopt_legacy_fingerprint(app, new, old)
+    assert not nc.adopt_legacy_fingerprint(app, "other", "unrelated")
+    assert nc.load(app, new) == params
+
+
+def test_adopt_without_calibration_does_nothing(tmp_path):
+    assert not nc.adopt_legacy_fingerprint(str(tmp_path), "new", "old")

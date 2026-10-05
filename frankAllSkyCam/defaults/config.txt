@@ -45,8 +45,8 @@ picture_rotation = 0
 # NOTE: --denoise cdn_hq is applied by frankAllSkyCam at night regardless of
 # what's set here (chrominance-only colour denoise, removes red/purple hot-
 # pixel speckle from long exposures) - don't set --denoise here for night,
-# it will be overridden. --sharpness/--contrast at night come from
-# night_sharpness/night_contrast below, not from here.
+# it will be overridden. --sharpness at night comes from night_sharpness
+# below, not from here. --contrast has no effect on night captures.
 additional_night_params = --gain 10 --awbgains 2.7,1.5
 additional_day_params = --metering average
 
@@ -57,15 +57,17 @@ additional_day_params = --metering average
 # correction sees it). Leave empty to let libcamera pick a mode itself.
 night_mode =
 
-# night_sharpness/night_contrast: forced at night to preserve faint stars
-# against the ISP's daylight-tuned defaults, which were assumed to crush
-# them - untested against real captures. A known-good pre-regression
-# capture used contrast 2.5 (the ISP default, i.e. no override) with
-# visibly fewer hot-pixel artifacts than contrast 1.0, so that assumption
-# is worth re-testing; change these to compare.
+# night_sharpness: ISP sharpness forced at night to preserve faint stars
+# against the ISP's daylight-tuned default.
 night_sharpness = 0
-night_contrast = 1.0
 
+
+[night_display]
+# brightness (0-1) a typical night sky background is lifted to on the saved image;
+# applied after all measurements, in both exposure modes. 0 keeps frames as captured.
+night_stretch = 0.20
+# grey-balance the night sky colour on the saved image
+night_neutral_sky = True
 
 [timelapse]
 # if True, timelapse from sunset to sunrise will be generated  Otherwise, not.

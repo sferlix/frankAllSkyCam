@@ -3,8 +3,8 @@ One-off tool that builds the master dark frame library for darksubtract.py.
 
 Run it manually with the dome/lens physically covered. For each exposure in
 EXPOSURES_SECS it captures DARK_FRAMES_PER_EXPOSURE darks with the same libcamera-still
-parameters as a night capture (additional_night_params, night_mode, night_sharpness,
-night_contrast), averages them into one master dark and saves it as lossless PNG.
+parameters as a night capture (additional_night_params, night_mode, night_sharpness),
+averages them into one master dark and saves it as lossless PNG.
 Re-run it whenever one of those settings changes: darksubtract.py refuses a library
 captured under different settings.
 
@@ -50,7 +50,6 @@ def main():
     additional_night_params = str(config['libcamera']['additional_night_params'])
     night_mode = str(config['libcamera'].get('night_mode', '')).strip()
     night_sharpness = str(config['libcamera'].get('night_sharpness', '0')).strip()
-    night_contrast = str(config['libcamera'].get('night_contrast', '1.0')).strip()
 
     appPath = os.path.expanduser("~") + "/frankAllSkyCam/"
     darks_dir = os.path.join(appPath, darksubtract.DARKS_DIRNAME)
@@ -65,7 +64,6 @@ def main():
     print("  additional_night_params = " + additional_night_params)
     print("  night_mode = " + (night_mode or "(none)"))
     print("  night_sharpness = " + night_sharpness)
-    print("  night_contrast = " + night_contrast)
 
     # Pause before the interactive prompt: the wait for the user to cover the dome is
     # unbounded and a scheduled capture during it would contend for the camera
@@ -76,13 +74,12 @@ def main():
         print("=" * 60)
 
         _captureAllDarks(darks_dir, horiz, vert, additional_night_params,
-                          night_mode, night_sharpness, night_contrast)
+                          night_mode, night_sharpness)
 
         manifest = {
             "additional_night_params": additional_night_params,
             "night_mode": night_mode,
             "night_sharpness": night_sharpness,
-            "night_contrast": night_contrast,
             "exposures": EXPOSURES_SECS,
             "frames_per_exposure": DARK_FRAMES_PER_EXPOSURE,
         }
@@ -98,7 +95,7 @@ def main():
 
 
 def _captureAllDarks(darks_dir, horiz, vert, additional_night_params,
-                      night_mode, night_sharpness, night_contrast):
+                      night_mode, night_sharpness):
     for exp in EXPOSURES_SECS:
         out_path = os.path.join(darks_dir, darksubtract.darkFilename(exp))
         frames = []
@@ -112,7 +109,7 @@ def _captureAllDarks(darks_dir, horiz, vert, additional_night_params,
             command += additional_night_params
             if night_mode:
                 command += " --mode " + night_mode
-            command += " --denoise cdn_hq --sharpness " + night_sharpness + " --contrast " + night_contrast + " "
+            command += " --denoise cdn_hq --sharpness " + night_sharpness + " "
             print("Capturing " + str(exp) + "s dark " + str(i + 1) + "/" +
                   str(DARK_FRAMES_PER_EXPOSURE) + " -> " + temp_path)
             print(command)

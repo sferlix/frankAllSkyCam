@@ -6,7 +6,7 @@ capturedarks.py).
 
 Opt-in by directory: without appPath/darks/manifest.json load() returns None and
 applyToFile() does nothing. A library is valid only for the exact
-additional_night_params/night_mode/night_sharpness/night_contrast it was captured
+additional_night_params/night_mode/night_sharpness it was captured
 under; load() refuses a stale one.
 
 Approximate: the frames are JPEGs (nonlinear, lossy), not linear RAW, so it cancels a
@@ -30,7 +30,7 @@ def darkFilename(exposure_secs):
     return "dark_%03ds.png" % round(exposure_secs)
 
 
-def load(appPath, additional_night_params, night_mode, night_sharpness, night_contrast):
+def load(appPath, additional_night_params, night_mode, night_sharpness):
     '''
     Returns (exposures, frames): exposures sorted ascending (seconds) and the matching
     cv2.imread arrays; or None if the library is missing, empty, incomplete or was
@@ -47,7 +47,6 @@ def load(appPath, additional_night_params, night_mode, night_sharpness, night_co
         "additional_night_params": additional_night_params,
         "night_mode": night_mode,
         "night_sharpness": night_sharpness,
-        "night_contrast": night_contrast,
     }
     for key, value in current.items():
         if str(manifest.get(key)) != str(value):
@@ -97,8 +96,8 @@ def subtract(image, exposures, frames, exposure_secs):
 
 
 def applyToFile(jpg_file_name, appPath, exposure_secs, additional_night_params,
-                 night_mode, night_sharpness, night_contrast):
-    library = load(appPath, additional_night_params, night_mode, night_sharpness, night_contrast)
+                 night_mode, night_sharpness):
+    library = load(appPath, additional_night_params, night_mode, night_sharpness)
     if library is None:
         return False
     exposures, frames = library

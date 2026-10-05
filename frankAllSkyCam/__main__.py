@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib, displaystretch
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -35,7 +35,9 @@ additional_night_params = str(config['libcamera']['additional_night_params'])
 additional_day_params = str(config['libcamera']['additional_day_params'])
 night_mode = str(config['libcamera'].get('night_mode', '')).strip()
 night_sharpness = str(config['libcamera'].get('night_sharpness', '0')).strip()
-night_contrast = str(config['libcamera'].get('night_contrast', '1.0')).strip()
+# no longer a setting (--contrast has no effect with --immediate); read only to carry an
+# existing night calibration over to the fingerprint without it
+legacy_night_contrast = str(config['libcamera'].get('night_contrast', '1.0')).strip()
 
 font_size   = int(config['font']['font_size'])
 font_colorR = int(config['font']['font_colorR'])
@@ -109,6 +111,10 @@ ae_twilight_ev_bias = config.getfloat('auto_exposure', 'twilight_ev_bias', fallb
 ae_saturation_clip_frac_threshold = config.getfloat('auto_exposure', 'saturation_clip_frac_threshold', fallback=0.05)
 ae_saturation_severity_gain = config.getfloat('auto_exposure', 'saturation_severity_gain', fallback=8.0)
 use_sqm_le = config['sqm']['use_sqm_le']
+
+# display stretch of night and twilight-band frames (displaystretch.py); 0 disables
+night_stretch = config.getfloat('night_display', 'night_stretch', fallback=0.20)
+night_neutral_sky = config.getboolean('night_display', 'night_neutral_sky', fallback=True)
 
 isFTP = str(config['ftp']['isFTP'])=='True'
 FTP_server = str(config['ftp']['FTP_server'])
@@ -266,10 +272,10 @@ def _run():
        # overrides any --denoise in additional_night_params.
        #
        # [libcamera] night_mode pins a sensor readout mode (empty: libcamera chooses);
-       # night_sharpness and night_contrast set the ISP sharpness and contrast.
+       # night_sharpness sets the ISP sharpness.
        if night_mode:
           command += " --mode " + night_mode
-       command += " --denoise cdn_hq --sharpness " + night_sharpness + " --contrast " + night_contrast + " "
+       command += " --denoise cdn_hq --sharpness " + night_sharpness + " "
     else:
        if twilight_isp_mode:
           # twilight frame: the ISP auto-exposes and the values it chose are read back from its
@@ -323,7 +329,7 @@ def _run():
           # and the watermark
           if not darksubtract.applyToFile(jpg_file_name, appPath, exposure_secs,
                                            additional_night_params, night_mode,
-                                           night_sharpness, night_contrast):
+                                           night_sharpness):
              hotpixels.applyToFile(jpg_file_name, appPath)
 
        # stars (night) and clouds (day or night); a twilight-handoff frame uses the ISP's
@@ -336,7 +342,12 @@ def _run():
        # exposure and use the texture-only signal instead.
        cloud_is_isp_driven = twilight_isp_mode or (cloud_exposure_secs is None and sun_alt < 0)
        # night moon model: self-calibrated per install (nightcalib.py); off until calibrated
-       calib_fp = nightcalib.fingerprint(additional_night_params, night_contrast, night_sharpness, horiz, vert, 0.65)
+       calib_fp = nightcalib.fingerprint(additional_night_params, night_sharpness, horiz, vert, 0.65)
+       night_calibration = nightcalib.load(appPath, calib_fp)
+       if night_calibration is None and nightcalib.adopt_legacy_fingerprint(
+             appPath, calib_fp, nightcalib.legacy_fingerprint(
+                additional_night_params, legacy_night_contrast, night_sharpness, horiz, vert, 0.65)):
+          night_calibration = nightcalib.load(appPath, calib_fp)
        sky_features = {}
        print("calculating stars on: " + jpg_file_name)
        sst, scl  = starscalc.analyze_sky_robust(jpg_file_name, 0.65, 0.4, 30, exposure_secs=cloud_exposure_secs,
@@ -348,7 +359,7 @@ def _run():
                                                     data.get("moonAlt"), data.get("moonIllumination")),
                                                  moon_brightness=starscalc.moon_sky_brightness(
                                                     data.get("moonAlt"), data.get("moonIllumination")),
-                                                 night_calibration=nightcalib.load(appPath, calib_fp),
+                                                 night_calibration=night_calibration,
                                                  features=sky_features)
        if nightcalib.record(appPath, sky_features, calib_fp):
           nightcalib.maybe_calibrate(appPath, calib_fp)
@@ -367,6 +378,8 @@ def _run():
           # feed this run's raw (pre-watermark) frame into the auto-exposure state in every mode;
           # day captures are not tracked (the ISP exposes)
           autoexposure.recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=ae_roi_percent)
+          # display stretch of the saved frame (any exposure mode), after every measurement
+          displaystretch.applyToFile(jpg_file_name, appPath, night_stretch, night_neutral_sky, sun_alt)
 
 
        photo = drawtext.printWatermark(data, jpg_file_name, font_size, font_color, sqm_le, rotation, text_positions, extra_text)

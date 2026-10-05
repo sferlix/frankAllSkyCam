@@ -255,7 +255,7 @@ Every real sensor has a handful of individual defective photosites ("hot pixels"
 python -m frankAllSkyCam.capturedarks
 ```
 
-Run this **with the lens/dome physically covered** - this camera has no shutter, so it can't be automated mid-sequence; the tool prompts you and waits. It captures 5 exposures (5, 15, 30, 45, 60 seconds) x 5 frames each, averaged into one master dark per exposure (averaging reduces the dark frames' own noise without affecting the fixed pattern they're meant to cancel), and saves the result to `~/frankAllSkyCam/darks/`. It also pauses your regular capture schedule and the watchdog for the duration (both are automatically restored afterward, even if the tool is interrupted) so nothing races it for the camera or reboots the Pi mid-session. Re-run it whenever `additional_night_params`, `night_mode`, `night_sharpness`, or `night_contrast` change in `config.txt` - a stale library (captured under different settings) is automatically detected and ignored rather than silently misapplied.
+Run this **with the lens/dome physically covered** - this camera has no shutter, so it can't be automated mid-sequence; the tool prompts you and waits. It captures 5 exposures (5, 15, 30, 45, 60 seconds) x 5 frames each, averaged into one master dark per exposure (averaging reduces the dark frames' own noise without affecting the fixed pattern they're meant to cancel), and saves the result to `~/frankAllSkyCam/darks/`. It also pauses your regular capture schedule and the watchdog for the duration (both are automatically restored afterward, even if the tool is interrupted) so nothing races it for the camera or reboots the Pi mid-session. Re-run it whenever `additional_night_params`, `night_mode` or `night_sharpness` change in `config.txt` - a stale library (captured under different settings) is automatically detected and ignored rather than silently misapplied.
 
 **Hot-pixel coordinate correction** (cheaper fallback, used automatically only if no dark library is present) - corrects a fixed list of known defective pixel coordinates without needing to cover the lens:
 
@@ -273,11 +273,23 @@ Moonlight makes a clear sky brighter and bluer, and every camera, white balance 
 - **Collecting:** every night capture (Sun more than 18 degrees below the horizon) adds one small row of measurements - sky brightness per second of exposure, sky color, star count, texture and the Moon's brightness - to `~/frankAllSkyCam/log/night_calibration_samples.csv`. No images are copied and no cron job is added.
 - **Calibrating:** once the samples cover a few clear moonless nights and a few clear nights under a bright Moon (typically 1-3 weeks; longer after a cloudy spell, since it needs both), it derives the clear-sky brightness, the effect of the Moon and the clear-sky color for your camera, without anyone labelling frames. The result is saved to `~/frankAllSkyCam/night_calibration.json`, together with the outcome of the last attempt (e.g. `not calibrated: not enough clear moonlit frames yet`).
 - **Using it:** with a calibration, night cloud cover compares each frame with the clear sky expected for the current Moon - its brightness and its color (moonlit clear sky is blue, moonlit cloud grey, light-polluted cloud yellow) - and expects fewer stars under a brighter Moon. Until the first calibration exists, the previous night detection is used unchanged.
-- **Staying current:** it recalibrates every 30 days from the last 60 days of samples (older samples are deleted, so the file stays at a few MB). Changing the camera settings it depends on (`additional_night_params` such as gain and white balance, `night_contrast`, `night_sharpness`, or the resolution) automatically discards the old calibration and starts collecting again.
+- **Staying current:** it recalibrates every 30 days from the last 60 days of samples (older samples are deleted, so the file stays at a few MB). Changing the camera settings it depends on (`additional_night_params` such as gain and white balance, `night_sharpness`, or the resolution) automatically discards the old calibration and starts collecting again.
 
 A calibration that fails its plausibility checks is never applied. To start over, delete `night_calibration.json` and `log/night_calibration_samples.csv`.
 
 **Star count on dark nights:** under a dark, moonless sky (once calibrated) dense star fields such as the Milky Way are counted in full instead of being discarded as clutter, so the reported star count is noticeably higher than before on clear moonless nights.
+
+## 9. Brighter, neutral night images
+
+Straight out of the camera, a night frame is dark (the sky background sits around 12% of full brightness) and greenish (the fixed night white balance). After all measurements are taken - exposure feedback, star count, cloud cover and the night calibration all use the frame as captured - frankAllSkyCam lifts the midtones of the saved image with a fixed curve and grey-balances the sky. Night images are brighter and more neutral, and clouds lit by light pollution are easier to see. This applies in both exposure modes. It's set in `config.txt`:
+
+```
+[night_display]
+night_stretch = 0.20        # brightness a typical night sky background is lifted to; 0 keeps frames as captured
+night_neutral_sky = True    # grey-balance the night sky colour
+```
+
+If the section is missing, these defaults apply. The same curve is used for every frame, so timelapses don't flicker. During twilight the effect fades out, and it leaves a frame untouched when its sky colour can't be balanced (deep blue twilight, where the red channel is already gone in the captured image).
 
 ---
 
@@ -302,7 +314,7 @@ Exposure duration is predicted from SQM via a small polynomial model, trained fr
 
 Add or adjust pairs to retune the curve for your own site/camera/gain settings - the software interpolates (degree-3 polynomial regression) between the values you provide. The `esp_secs` parameter in `config.txt` always caps the maximum exposure regardless of what the model predicts.
 
-You can also fully customize the `rpicam-still`/`libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, anything it accepts (just don't set `--shutter`, `--immediate`, `--mode`, `--denoise`, `--sharpness` or `--contrast` there - those are fixed by frankAllSkyCam at night, since the ISP's daylight-tuned defaults for denoise/sharpen/contrast actively suppress faint stars, and `--mode` pins a true 2x2-binned, full-FOV sensor readout for better low-light sensitivity per pixel - not just a wider `--gain`).
+You can also fully customize the `rpicam-still`/`libcamera-still` invocation via `additional_night_params` / `additional_day_params` in `config.txt` - gain, white balance, anything it accepts (just don't set `--shutter`, `--immediate`, `--mode`, `--denoise` or `--sharpness` there - those are fixed by frankAllSkyCam at night, since the ISP's daylight-tuned denoise and sharpening suppress faint stars; `--contrast` has no effect on night captures, which use `--immediate`, and `--mode` pins a true 2x2-binned, full-FOV sensor readout for better low-light sensitivity per pixel - not just a wider `--gain`).
 
 ### Alternative exposure strategy: auto_exposure
 

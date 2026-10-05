@@ -55,11 +55,51 @@ BOUNDS = {"clear_rate": (0.01, 100.0), "moon_rate_coeff": (0.5, 1000.0),
           "clear_star_count": (MIN_CLEAR_STARS, 10000)}
 
 
-def fingerprint(additional_night_params, night_contrast, night_sharpness, width, height, roi_ratio):
+def fingerprint(additional_night_params, night_sharpness, width, height, roi_ratio):
     # short hash of the camera settings the calibration depends on
-    key = "|".join(str(v).strip() for v in (additional_night_params, night_contrast, night_sharpness,
-                                            width, height, roi_ratio))
+    return _hash((additional_night_params, night_sharpness, width, height, roi_ratio))
+
+
+def legacy_fingerprint(additional_night_params, night_contrast, night_sharpness, width, height, roi_ratio):
+    # fingerprint as computed while the night_contrast setting existed
+    return _hash((additional_night_params, night_contrast, night_sharpness, width, height, roi_ratio))
+
+
+def _hash(values):
+    key = "|".join(str(v).strip() for v in values)
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
+
+
+def adopt_legacy_fingerprint(app_path, fp, legacy_fp):
+    # moves a calibration saved under legacy_fp, and its samples, to fp; never raises.
+    # Returns True when the calibration was moved.
+    try:
+        path = os.path.join(app_path, CALIBRATION_FILE)
+        if fp == legacy_fp or not os.path.exists(path):
+            return False
+        with open(path) as f:
+            state = json.load(f)
+        if state.get("fingerprint") != legacy_fp:
+            return False
+        samples = os.path.join(app_path, SAMPLES_FILE)
+        if os.path.exists(samples):
+            with open(samples, newline="") as f:
+                rows = list(csv.reader(f))
+            col = FIELDS.index("fingerprint")
+            for row in rows[1:]:
+                if len(row) > col and row[col] == legacy_fp:
+                    row[col] = fp
+            tmp = samples + ".tmp"
+            with open(tmp, "w", newline="") as f:
+                csv.writer(f).writerows(rows)
+            os.replace(tmp, samples)
+        state["fingerprint"] = fp
+        _write_json(path, state)
+        print("nightcalib: calibration moved to fingerprint " + fp)
+        return True
+    except Exception as e:
+        print("nightcalib.adopt_legacy_fingerprint failed: " + str(e))
+        return False
 
 
 def record(app_path, features, fp, now=None):
