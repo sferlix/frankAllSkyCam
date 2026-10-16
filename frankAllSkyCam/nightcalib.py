@@ -33,7 +33,8 @@ import statistics
 SAMPLES_FILE = "log/night_calibration_samples.csv"
 CALIBRATION_FILE = "night_calibration.json"
 FIELDS = ["time_utc", "night", "fingerprint", "sun_alt", "moon_brightness", "exposure",
-          "rate", "nbr", "tex", "stars", "moon_in_frame"]
+          "rate", "nbr", "tex", "stars", "moon_in_frame", "cloud_pct", "reported_stars"]
+LEGACY_FIELD_COUNT = 11         # rows written before cloud_pct/reported_stars were added
 
 WINDOW_DAYS = 60
 RECALIBRATE_DAYS = 30
@@ -83,16 +84,12 @@ def adopt_legacy_fingerprint(app_path, fp, legacy_fp):
             return False
         samples = os.path.join(app_path, SAMPLES_FILE)
         if os.path.exists(samples):
-            with open(samples, newline="") as f:
-                rows = list(csv.reader(f))
+            rows = _read_rows(samples)
             col = FIELDS.index("fingerprint")
-            for row in rows[1:]:
-                if len(row) > col and row[col] == legacy_fp:
+            for row in rows:
+                if row[col] == legacy_fp:
                     row[col] = fp
-            tmp = samples + ".tmp"
-            with open(tmp, "w", newline="") as f:
-                csv.writer(f).writerows(rows)
-            os.replace(tmp, samples)
+            _write_rows(samples, rows)
         state["fingerprint"] = fp
         _write_json(path, state)
         print("nightcalib: calibration moved to fingerprint " + fp)
@@ -112,7 +109,10 @@ def record(app_path, features, fp, now=None):
         now = now or datetime.datetime.now().astimezone()
         night = (now - datetime.timedelta(hours=12)).date().isoformat()
         path = os.path.join(app_path, SAMPLES_FILE)
+        if os.path.exists(path) and _header(path) != FIELDS:
+            _write_rows(path, _read_rows(path))  # older layout or damaged header: rewrite once
         new_file = not os.path.exists(path)
+        cloud, reported = features.get("cloud_pct"), features.get("reported_stars")
         with open(path, "a", newline="") as f:
             w = csv.writer(f)
             if new_file:
@@ -120,7 +120,8 @@ def record(app_path, features, fp, now=None):
             w.writerow([now.astimezone(datetime.timezone.utc).isoformat(timespec="seconds"), night, fp,
                         round(features["sun_alt"], 2), round(features["moon_brightness"], 5),
                         round(features["exposure"], 4), round(features["rate"], 5), round(features["nbr"], 4),
-                        round(features["tex"], 3), int(features["stars"]), int(features["moon_in_frame"])])
+                        round(features["tex"], 3), int(features["stars"]), int(features["moon_in_frame"]),
+                        "" if cloud is None else round(float(cloud), 1), "" if reported is None else int(reported)])
         return True
     except Exception as e:
         print("nightcalib.record failed: " + str(e))
@@ -181,15 +182,15 @@ def read_samples(app_path, fp, since):
     path = os.path.join(app_path, SAMPLES_FILE)
     if not os.path.exists(path):
         return rows
-    with open(path, newline="") as f:
-        for r in csv.DictReader(f):
-            try:
-                if r["fingerprint"] != fp or datetime.datetime.fromisoformat(r["time_utc"]) < since:
-                    continue
-                rows.append(dict(night=r["night"], mb=float(r["moon_brightness"]), rate=float(r["rate"]),
-                                 nbr=float(r["nbr"]), tex=float(r["tex"]), stars=float(r["stars"])))
-            except (KeyError, ValueError):
+    for row in _read_rows(path):
+        r = dict(zip(FIELDS, row))
+        try:
+            if r["fingerprint"] != fp or datetime.datetime.fromisoformat(r["time_utc"]) < since:
                 continue
+            rows.append(dict(night=r["night"], mb=float(r["moon_brightness"]), rate=float(r["rate"]),
+                             nbr=float(r["nbr"]), tex=float(r["tex"]), stars=float(r["stars"])))
+        except (KeyError, ValueError):
+            continue
     return rows
 
 
@@ -254,21 +255,42 @@ def _prune_samples(app_path, since):
     path = os.path.join(app_path, SAMPLES_FILE)
     if not os.path.exists(path):
         return
+    _write_rows(path, [r for r in _read_rows(path) if datetime.datetime.fromisoformat(r[0]) >= since])
+
+
+def _header(path):
     with open(path, newline="") as f:
-        reader = csv.reader(f)
-        header = next(reader, None)
-        keep = []
+        return next(csv.reader(line.replace("\0", "") for line in f), None)
+
+
+def _read_rows(path):
+    # the sample rows as lists of len(FIELDS) strings, header excluded. Tolerates damage from an
+    # unclean shutdown: NUL bytes are dropped, and so is any row whose field count matches neither
+    # layout or whose timestamp does not parse. Legacy rows are padded with empty values.
+    rows = []
+    with open(path, newline="") as f:
+        reader = csv.reader(line.replace("\0", "") for line in f)
         for row in reader:
-            try:
-                if datetime.datetime.fromisoformat(row[0]) >= since:
-                    keep.append(row)
-            except (IndexError, ValueError):
+            if row and row[0] == FIELDS[0]:
                 continue
+            if len(row) == LEGACY_FIELD_COUNT:
+                row = row + [""] * (len(FIELDS) - LEGACY_FIELD_COUNT)
+            if len(row) != len(FIELDS):
+                continue
+            try:
+                datetime.datetime.fromisoformat(row[0])
+            except ValueError:
+                continue
+            rows.append(row)
+    return rows
+
+
+def _write_rows(path, rows):
     tmp = path + ".tmp"
     with open(tmp, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(header or FIELDS)
-        w.writerows(keep)
+        w.writerow(FIELDS)
+        w.writerows(rows)
     os.replace(tmp, path)
 
 

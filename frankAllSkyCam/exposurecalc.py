@@ -33,10 +33,15 @@ def getExposure(sq, esp_secs=None, appPath=None):
    sqmVals = []
    expVals = []
    with open(csvfile, newline='') as f:
-      reader = csv.DictReader(f)
+      # NUL bytes (left by an unclean shutdown) dropped; damaged rows skipped
+      reader = csv.DictReader(line.replace("\0", "") for line in f)
       for row in reader:
-         sqmVals.append(float(row['sqm']))
-         expVals.append(float(row['secs']))
+         try:
+            sqm_val, exp_val = float(row['sqm']), float(row['secs'])
+         except (KeyError, TypeError, ValueError):
+            continue
+         sqmVals.append(sqm_val)
+         expVals.append(exp_val)
 
    sqmVals = numpy.array(sqmVals)
    expVals = numpy.array(expVals)

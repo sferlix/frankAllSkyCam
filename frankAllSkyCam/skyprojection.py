@@ -69,11 +69,15 @@ def load_calibration_samples(csv_path, body):
         return []
     samples = []
     with open(csv_path, newline="") as f:
-        reader = csv.DictReader(f)
+        # NUL bytes (left by an unclean shutdown) dropped; damaged rows skipped
+        reader = csv.DictReader(line.replace("\0", "") for line in f)
         for row in reader:
-            if row["body"] != body:
+            try:
+                if row["body"] != body:
+                    continue
+                samples.append((float(row["alt_deg"]), float(row["az_deg"]), float(row["pixel_x"]), float(row["pixel_y"])))
+            except (KeyError, TypeError, ValueError):
                 continue
-            samples.append((float(row["alt_deg"]), float(row["az_deg"]), float(row["pixel_x"]), float(row["pixel_y"])))
     return samples
 
 

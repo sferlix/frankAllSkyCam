@@ -13,7 +13,7 @@ import time
 from zoneinfo import ZoneInfo
 from importlib import resources  # Python 3.7+
 from configparser import ConfigParser
-from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib, displaystretch, sqmcache
+from frankAllSkyCam import fileManager, drawtext, getextdata, logos, calculateEphem, sqmreader, exposurecalc, autoexposure, starscalc, hotpixels, darksubtract, skystatus, nightcalib, displaystretch, sqmcache, rawframes
 
 config = ConfigParser()
 configFileName = fileManager.getConfigFileName()
@@ -374,6 +374,7 @@ def _run():
                                                     data.get("moonAlt"), data.get("moonIllumination")),
                                                  night_calibration=night_calibration,
                                                  features=sky_features)
+       sky_features.update(cloud_pct=scl, reported_stars=sst)
        if nightcalib.record(appPath, sky_features, calib_fp):
           nightcalib.maybe_calibrate(appPath, calib_fp)
        data["stars"] = sst
@@ -388,6 +389,8 @@ def _run():
           moon_illumination=data["moonIllumination"], moon_phase=data["moonPhaseName"])
 
        if exposure_secs is not None:
+          # keep an occasional copy of the frame as analysed, before the stretch and the watermark
+          rawframes.save(appPath, jpg_file_name)
           # feed this run's raw (pre-watermark) frame into the auto-exposure state in every mode;
           # day captures are not tracked (the ISP exposes)
           autoexposure.recordExposureResult(jpg_file_name, exposure_secs, appPath, roi_percent=ae_roi_percent)
